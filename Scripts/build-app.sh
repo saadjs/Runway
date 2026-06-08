@@ -7,6 +7,19 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CONFIG="${1:-release}"
 APP="$ROOT/build/Runway.app"
 
+# Signing identity. Defaults to ad-hoc ("-") for local dev. For distribution,
+# release.sh sets SIGN_IDENTITY to the Developer ID Application cert, which also
+# enables the hardened runtime + secure timestamp required for notarization.
+SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+SIGN_FLAGS=(--force --sign "$SIGN_IDENTITY")
+if [ "$SIGN_IDENTITY" != "-" ]; then
+    SIGN_FLAGS+=(--options runtime --timestamp)
+fi
+
+# Marketing version (CFBundleShortVersionString). CI sets this from the git tag.
+APP_VERSION="${APP_VERSION:-1.0}"
+APP_BUILD="${APP_BUILD:-1}"
+
 cd "$ROOT"
 swift build -c "$CONFIG"
 BIN="$(swift build -c "$CONFIG" --show-bin-path)/Runway"
@@ -59,11 +72,15 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 
-# Stable ad-hoc identity keeps keychain grants from re-prompting each launch.
-# Sign the nested resource bundle first, then the app (inside-out).
-if [ -d "$APP/Contents/Resources/Runway_Runway.bundle" ]; then
-    codesign --force --sign - "$APP/Contents/Resources/Runway_Runway.bundle"
-fi
-codesign --force --sign - --identifier app.runway "$APP"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $APP_VERSION" \
+    -c "Set :CFBundleVersion $APP_BUILD" "$APP/Contents/Info.plist"
 
-echo "Built: $APP"
+# A stable identity keeps keychain grants from re-prompting each launch (ad-hoc
+# for dev; Developer ID for releases, which also has a stable designated
+# requirement). Sign the nested resource bundle first, then the app (inside-out).
+if [ -d "$APP/Contents/Resources/Runway_Runway.bundle" ]; then
+    codesign "${SIGN_FLAGS[@]}" "$APP/Contents/Resources/Runway_Runway.bundle"
+fi
+codesign "${SIGN_FLAGS[@]}" --identifier app.runway "$APP"
+
+echo "Built: $APP (signed: $SIGN_IDENTITY)"
