@@ -3,8 +3,8 @@
 # frozen_string_literal: true
 
 cask "runway" do
-  version "1.0"
-  sha256 "6d7ca6f6814b9ce2432905dc3554827d297e6b5d5414f72c98e28226ba616d1a"
+  version "1.1"
+  sha256 "6fb3a4c760a387a4da3c47e767fef6308c9a0362b5546e980f4355202986d743"
 
   url "https://github.com/saadjs/Runway/releases/download/v#{version}/Runway-#{version}.zip"
   name "Runway"
