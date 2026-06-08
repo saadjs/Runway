@@ -27,10 +27,12 @@
 
 - Reads the credentials the `claude` and `codex` CLIs already store, so there's
   nothing to log into.
-- Shows each provider's rolling 5-hour and 7-day windows with a percentage and a
-  reset countdown.
+- Shows each provider's rolling 5-hour and 7-day windows with a percentage and an
+  optional reset countdown.
 - The menu-bar label shows the highest current 5-hour usage at a glance.
-- Refreshes on launch, every 5 minutes, and on demand.
+- Refreshes on launch, on a configurable interval (default 5 min), and on demand.
+- Settings (⌘,): launch at login, refresh interval (presets or a custom value),
+  per-provider show/hide, and a toggle for the reset countdown.
 
 ## How usage is fetched
 
@@ -125,7 +127,7 @@ Sources/Runway/
   App/        RunwayApp.swift        MenuBarExtra + accessory policy
   Core/       UsageModels, UsageProvider, ProviderRegistry, Keychain
   Providers/  ClaudeProvider, CodexProvider
-  Store/      UsageStore                 refresh loop + state
-  Views/      MenuView, ProviderCardView, UsageBarView, Support
+  Store/      UsageStore, AppSettings    refresh loop + state, preferences
+  Views/      MenuView, ProviderCardView, UsageBarView, SettingsView, Support
   Resources/  claude.pdf, codex.pdf      official logos (template-tinted)
 ```
