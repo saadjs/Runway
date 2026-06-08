@@ -2,7 +2,7 @@
 
 <p align="center">
   A minimal macOS menu-bar app that shows your <b>5-hour</b> and <b>weekly</b> usage
-  limits for <b>Claude Code</b> and <b>Codex</b> — nothing else.<br>
+  limits for <b>Claude Code</b> and <b>Codex</b>, nothing else.<br>
   Native components, official logos, system colors only.
 </p>
 
