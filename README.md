@@ -1,15 +1,26 @@
-# Runway
+<h1 align="center">Runway</h1>
 
-A minimal macOS menu-bar app that shows your **5-hour** and **weekly** usage
-limits for **Claude Code** and **Codex** — nothing else. Native components,
-official logos, system colors only.
+<p align="center">
+  A minimal macOS menu-bar app that shows your <b>5-hour</b> and <b>weekly</b> usage
+  limits for <b>Claude Code</b> and <b>Codex</b> — nothing else.<br>
+  Native components, official logos, system colors only.
+</p>
 
-<sub>macOS 13+ · SwiftUI `MenuBarExtra` · menu-bar only (no Dock icon)</sub>
+<p align="center">
+  <sub>macOS 13+ · SwiftUI <code>MenuBarExtra</code> · menu-bar only (no Dock icon)</sub>
+</p>
 
-<p>
-  <img src="docs/menubar.png" alt="Runway menu-bar label" height="22">
-  &nbsp;&nbsp;
-  <img src="docs/popover.png" alt="Runway popover showing Claude and Codex usage" width="300">
+<p align="center">
+  <a href="https://github.com/saadjs/Runway/releases"><img src="https://img.shields.io/github/v/release/saadjs/Runway?sort=semver&display_name=tag&label=release&color=2dba4e" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/macOS-13%2B-000000?logo=apple&logoColor=white" alt="macOS 13+">
+  <img src="https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white" alt="Swift 5">
+  <a href="https://github.com/saadjs/homebrew-tap"><img src="https://img.shields.io/badge/install-brew%20cask-FBB040?logo=homebrew&logoColor=white" alt="Homebrew cask"></a>
+  <img src="https://img.shields.io/badge/notarized-%E2%9C%93-2dba4e" alt="Notarized">
+</p>
+
+<p align="center">
+  <img src="docs/popover.png" alt="Runway popover showing Claude and Codex usage" width="320"><br><br>
+  <img src="docs/menubar.png" alt="Runway menu-bar label" width="220">
 </p>
 
 ## What it does
