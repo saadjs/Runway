@@ -75,7 +75,7 @@ cat <<EOF
   Version  : $VERSION
   sha256   : $SHA
 
-Cask fields (update Casks/runway.rb in saadjs/homebrew-tap):
+Cask fields (update Casks/tokens-runway.rb in saadjs/homebrew-tap):
   version "$VERSION"
   sha256  "$SHA"
   url     "https://github.com/saadjs/Runway/releases/download/v$VERSION/Runway-$VERSION.zip"

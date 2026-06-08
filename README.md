@@ -46,7 +46,7 @@ written back to `auth.json`, matching what the CLI does.
 ## Install
 
 ```bash
-brew install --cask saadjs/tap/runway
+brew install --cask saadjs/tap/tokens-runway
 ```
 
 A notarized, stapled build straight from [Releases](https://github.com/saadjs/Runway/releases).
@@ -96,13 +96,13 @@ xcrun notarytool store-credentials runway-notary \
     ```
 
 3. Bump `version` **and** `sha256` (each notarized build has a unique hash) in
-   `saadjs/homebrew-tap/Casks/runway.rb`, using the values `release.sh` printed.
-   Keep `dist/runway.rb` in this repo in sync.
+   `saadjs/homebrew-tap/Casks/tokens-runway.rb`, using the values `release.sh` printed.
+   Keep `dist/tokens-runway.rb` in this repo in sync.
 
 Verify before announcing:
 
 ```bash
-brew update && brew fetch --cask saadjs/tap/runway   # resolves URL + checks sha256
+brew update && brew fetch --cask saadjs/tap/tokens-runway   # resolves URL + checks sha256
 ```
 
 ## Adding another provider
