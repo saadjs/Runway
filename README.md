@@ -38,6 +38,32 @@ For development you can also just `swift run`.
 > The first launch reads the Claude Keychain item; approve **Always Allow** once.
 > The build is ad-hoc signed so the grant persists across launches.
 
+## Release (notarized) & Homebrew
+
+```bash
+./Scripts/release.sh   # Developer ID sign + notarize + staple -> build/Runway-<v>.zip
+```
+
+`release.sh` builds with the hardened runtime, submits to Apple's notary
+service, staples the ticket, and zips the stapled `.app`. It then prints the
+`version`/`sha256`/`url` to drop into the cask.
+
+One-time setup — store an App Store Connect API key as a notarytool profile:
+
+```bash
+xcrun notarytool store-credentials runway-notary \
+  --key /path/to/AuthKey_XXXXXXXXXX.p8 --key-id XXXXXXXXXX \
+  --issuer xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+Then publish and update the tap:
+
+```bash
+gh release create v1.0 build/Runway-1.0.zip --repo saadjs/Runway --generate-notes
+# copy dist/runway.rb -> saadjs/homebrew-tap/Casks/runway.rb (fill in sha256)
+brew install --cask saadjs/tap/runway
+```
+
 ## Adding another provider
 
 The app is intentionally modular. To support a new app:
