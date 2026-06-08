@@ -6,6 +6,12 @@ official logos, system colors only.
 
 <sub>macOS 13+ · SwiftUI `MenuBarExtra` · menu-bar only (no Dock icon)</sub>
 
+<p>
+  <img src="docs/menubar.png" alt="Runway menu-bar label" height="22">
+  &nbsp;&nbsp;
+  <img src="docs/popover.png" alt="Runway popover showing Claude and Codex usage" width="300">
+</p>
+
 ## What it does
 
 - Reads the credentials the `claude` and `codex` CLIs already store, so there's
