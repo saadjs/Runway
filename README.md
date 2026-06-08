@@ -26,6 +26,14 @@ Claude tokens are **not** refreshed by Runway (the CLI rotates them); if the
 session is expired it asks you to run `claude`. Codex tokens are refreshed and
 written back to `auth.json`, matching what the CLI does.
 
+## Install
+
+```bash
+brew install --cask saadjs/tap/runway
+```
+
+A notarized, stapled build straight from [Releases](https://github.com/saadjs/Runway/releases).
+
 ## Build & run
 
 ```bash
