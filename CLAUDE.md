@@ -22,8 +22,13 @@ Data flows: **provider -> store -> views + menu-bar label**.
 
 - **`Core/UsageProvider`** — the protocol every monitored app implements (`id`, `displayName`, `shortCode`, `logoResource`, `fetchUsage() async throws -> ProviderUsage`). `ProviderUsage` holds a `fiveHour` and `weekly` `UsageWindow` (each a 0–100 `usedPercent` + optional `resetsAt`). Both providers normalize to this shape.
 - **`Core/ProviderRegistry.all`** — the single list of active providers. This is the modularity seam.
-- **`Store/UsageStore`** (`@MainActor`, `.shared`) — owns `[providerID: ProviderState]`, fetches all providers concurrently in a `TaskGroup`, and drives refreshes. Started from `AppDelegate.applicationDidFinishLaunching`, not from a view's `onAppear`.
-- **`Views/`** — `MenuView` (popover) -> `ProviderCardView` (a native `GroupBox` per provider) -> `UsageBarView` (a native `ProgressView`).
+- **`Store/UsageStore`** (`@MainActor`, `.shared`) — owns `[providerID: ProviderState]`, fetches all providers concurrently in a `TaskGroup`, and drives refreshes. Started from `AppDelegate.applicationDidFinishLaunching`, not from a view's `onAppear`. The refresh cadence comes from `AppSettings` (re-scheduled live via a Combine subscription).
+- **`Store/AppSettings`** (`@MainActor`, `.shared`) — user preferences persisted in `UserDefaults`: refresh interval, reset-countdown visibility, per-provider show/hide, and launch-at-login (backed by `SMAppService.mainApp`, not UserDefaults). Single source of truth read by the views and `UsageStore`.
+- **`Views/`** — `MenuView` (popover) -> `ProviderCardView` (a native `GroupBox` per provider) -> `UsageBarView` (a native `ProgressView`). `SettingsView` is a separate `Window` scene (id `SettingsWindow.id`), opened from the popover gear button via `openWindow` + `NSApp.activate` — **not** the SwiftUI `Settings` scene, which can't be reliably opened from a MenuBarExtra/LSUIElement app.
+
+### Settings / launch-at-login caveat
+
+Launch-at-login (`SMAppService.mainApp.register()`) only works from the **bundled, signed** app, ideally in `/Applications`; it throws when run via `swift run`. `AppSettings.setLaunchAtLogin` swallows the error and re-reads the real status, so the toggle just stays off in dev.
 
 ### Adding a provider (the intended extension path)
 
@@ -47,7 +52,7 @@ Data flows: **provider -> store -> views + menu-bar label**.
 - **`MenuBarExtra` label rendering is severely limited.** It reliably renders an `Image` + one `Text` and **silently drops** additional sibling views, `ForEach`, nested stacks, and inline-Image-in-`Text`. The label is therefore drawn as a single template `NSImage` in `App/MenuBarLabel.swift` (gauge glyph + per-provider text + SF Symbol locks composited by hand). Do not try to rebuild it with SwiftUI views — it will only show the first token.
 - **Keychain access requires in-memory caching.** Reading another app's keychain item prompts once ("Always Allow", bound to Runway's code signature). `ClaudeProvider`'s `CredentialCache` actor caches the token until ~expiry so refreshes don't re-prompt. The ad-hoc signature in `build-app.sh` keeps the grant stable across launches; rebuilds can re-prompt because ad-hoc cdhash changes.
 - **SwiftPM resource bundle + codesign.** SwiftPM emits a flat `Runway_Runway.bundle` (no Info.plist). `build-app.sh` copies it into `Contents/Resources/`, **injects a minimal Info.plist** so codesign accepts it as a nested bundle, and signs inner-bundle-first. `Bundle.module` resolves logos from there. The `.icns` and `LSUIElement`/`CFBundleIconFile` are also assembled in `build-app.sh` (there is no committed Info.plist for the app).
-- **Rate limiting.** Frequent Claude fetches hit Anthropic's rate limit (shown as "Rate limited by Anthropic"). `UsageStore.refresh(force:)` throttles non-forced refreshes (open + 5-min timer) to once per 30s; only the ↻ button passes `force: true`.
+- **Rate limiting.** Frequent Claude fetches hit Anthropic's rate limit (shown as "Rate limited by Anthropic"). `UsageStore.refresh(force:)` throttles non-forced refreshes (open + the configurable refresh timer) to once per 30s; only the ↻ button passes `force: true`. The shortest interval offered in Settings is 1 min, well above the 30s throttle.
 
 ## UI conventions
 
