@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SwiftUI
 
@@ -13,7 +14,7 @@ final class UsageStore: ObservableObject {
     let providers = ProviderRegistry.all
 
     private var timer: Timer?
-    private let refreshInterval: TimeInterval = 5 * 60
+    private var cancellables: Set<AnyCancellable> = []
     /// Skip refreshes (other than the manual button) within this window.
     private let minimumRefreshInterval: TimeInterval = 30
 
@@ -23,8 +24,20 @@ final class UsageStore: ObservableObject {
 
     func start() {
         Task { await refresh() }
+        scheduleTimer(minutes: AppSettings.shared.refreshIntervalMinutes)
+        // Reschedule when the user changes the refresh cadence in Settings.
+        // `@Published` emits in `willSet` (before the property updates), so use the
+        // value the publisher delivers rather than re-reading the stale property.
+        AppSettings.shared.$refreshIntervalMinutes
+            .dropFirst()
+            .sink { [weak self] minutes in self?.scheduleTimer(minutes: minutes) }
+            .store(in: &cancellables)
+    }
+
+    private func scheduleTimer(minutes: Int) {
         timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: refreshInterval, repeats: true) { [weak self] _ in
+        let interval = TimeInterval(minutes * 60)
+        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { await self?.refresh() }
         }
     }

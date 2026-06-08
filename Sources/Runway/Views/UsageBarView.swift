@@ -5,6 +5,7 @@ import SwiftUI
 struct UsageBarView: View {
     let title: String
     let window: UsageWindow?
+    var showResetCountdown = true
 
     var body: some View {
         ProgressView(value: window?.clampedFraction ?? 0) {
@@ -16,7 +17,7 @@ struct UsageBarView: View {
                 if window != nil {
                     Text(" used").foregroundStyle(.secondary)
                 }
-                if let reset = resetCountdown(window?.resetsAt) {
+                if showResetCountdown, let reset = resetCountdown(window?.resetsAt) {
                     Text(" · resets in \(reset)")
                         .foregroundStyle(.secondary)
                 }

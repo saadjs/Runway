@@ -22,8 +22,13 @@ Data flows: **provider -> store -> views + menu-bar label**.
 
 - **`Core/UsageProvider`** — the protocol every monitored app implements (`id`, `displayName`, `shortCode`, `logoResource`, `fetchUsage() async throws -> ProviderUsage`). `ProviderUsage` holds a `fiveHour` and `weekly` `UsageWindow` (each a 0–100 `usedPercent` + optional `resetsAt`). Both providers normalize to this shape.
 - **`Core/ProviderRegistry.all`** — the single list of active providers. This is the modularity seam.
-- **`Store/UsageStore`** (`@MainActor`, `.shared`) — owns `[providerID: ProviderState]`, fetches all providers concurrently in a `TaskGroup`, and drives refreshes. Started from `AppDelegate.applicationDidFinishLaunching`, not from a view's `onAppear`.
-- **`Views/`** — `MenuView` (popover) -> `ProviderCardView` (a native `GroupBox` per provider) -> `UsageBarView` (a native `ProgressView`).
+- **`Store/UsageStore`** (`@MainActor`, `.shared`) — owns `[providerID: ProviderState]`, fetches all providers concurrently in a `TaskGroup`, and drives refreshes. Started from `AppDelegate.applicationDidFinishLaunching`, not from a view's `onAppear`. The refresh cadence comes from `AppSettings` (re-scheduled live via a Combine subscription).
+- **`Store/AppSettings`** (`@MainActor`, `.shared`) — user preferences persisted in `UserDefaults`: refresh interval, reset-countdown visibility, per-provider show/hide, and launch-at-login (backed by `SMAppService.mainApp`, not UserDefaults). Single source of truth read by the views and `UsageStore`.
+- **`Views/`** — `MenuView` (popover) -> `ProviderCardView` (a native `GroupBox` per provider) -> `UsageBarView` (a native `ProgressView`). `SettingsView` is a separate `Window` scene (id `SettingsWindow.id`), opened from the popover gear button via `openWindow` + `NSApp.activate` — **not** the SwiftUI `Settings` scene, which can't be reliably opened from a MenuBarExtra/LSUIElement app.
+
+### Settings / launch-at-login caveat
+
+Launch-at-login (`SMAppService.mainApp.register()`) only works from the **bundled, signed** app, ideally in `/Applications`; it throws when run via `swift run`. `AppSettings.setLaunchAtLogin` swallows the error and re-reads the real status, so the toggle just stays off in dev.
 
 ### Adding a provider (the intended extension path)
 

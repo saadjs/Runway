@@ -5,6 +5,7 @@ import SwiftUI
 struct ProviderCardView: View {
     let provider: any UsageProvider
     let state: ProviderState
+    var showResetCountdown = true
 
     var body: some View {
         GroupBox {
@@ -21,8 +22,8 @@ struct ProviderCardView: View {
 
             case let .loaded(usage):
                 VStack(spacing: 10) {
-                    UsageBarView(title: "5-hour", window: usage.fiveHour)
-                    UsageBarView(title: "Weekly", window: usage.weekly)
+                    UsageBarView(title: "5-hour", window: usage.fiveHour, showResetCountdown: showResetCountdown)
+                    UsageBarView(title: "Weekly", window: usage.weekly, showResetCountdown: showResetCountdown)
                 }
                 .padding(.top, 2)
 
