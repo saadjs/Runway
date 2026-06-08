@@ -8,9 +8,12 @@ import SwiftUI
 final class AppSettings: ObservableObject {
     static let shared = AppSettings()
 
-    /// Refresh cadences offered in Settings. The 2-minute floor keeps Claude
-    /// fetches under Anthropic's rate limit (see CLAUDE.md); 5 min is the default.
-    static let refreshPresets = [2, 5, 10, 15, 30]
+    /// Quick-pick cadences in Settings; users can also enter a custom value via
+    /// the "Custom…" picker option. 5 min is the default. Note: very short
+    /// intervals can trip Anthropic's rate limit for Claude (see CLAUDE.md).
+    static let refreshPresets = [1, 2, 5, 10, 15, 30]
+    /// Bounds for a custom interval. 1 min floor (can't be zero/negative); 4 h cap.
+    static let refreshRange = 1...240
 
     private let defaults = UserDefaults.standard
     private enum Key {
@@ -33,7 +36,9 @@ final class AppSettings: ObservableObject {
 
     private init() {
         let stored = defaults.object(forKey: Key.refreshIntervalMinutes) as? Int
-        refreshIntervalMinutes = stored.flatMap { Self.refreshPresets.contains($0) ? $0 : nil } ?? 5
+        refreshIntervalMinutes = stored.map {
+            min(max($0, Self.refreshRange.lowerBound), Self.refreshRange.upperBound)
+        } ?? 5
         showResetCountdown = defaults.object(forKey: Key.showResetCountdown) as? Bool ?? true
         hiddenProviderIDs = Set(defaults.array(forKey: Key.hiddenProviderIDs) as? [String] ?? [])
         launchAtLogin = Self.isLoginEnabled
