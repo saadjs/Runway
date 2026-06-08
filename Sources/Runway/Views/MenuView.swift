@@ -20,6 +20,7 @@ struct MenuView: View {
                 }
                 .buttonStyle(.borderless)
                 .help("Settings")
+                .keyboardShortcut(",", modifiers: .command)
                 Button {
                     Task { await store.refresh(force: true) }
                 } label: {
@@ -28,6 +29,7 @@ struct MenuView: View {
                 .buttonStyle(.borderless)
                 .disabled(store.isRefreshing)
                 .help("Refresh now")
+                .keyboardShortcut("r", modifiers: .command)
             }
 
             if visibleProviders.isEmpty {
@@ -53,6 +55,7 @@ struct MenuView: View {
                 Button("Quit") { NSApplication.shared.terminate(nil) }
                     .buttonStyle(.borderless)
                     .font(.caption)
+                    .keyboardShortcut("q", modifiers: .command)
             }
         }
         .padding(14)
