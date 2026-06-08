@@ -17,10 +17,10 @@ official logos, system colors only.
 
 ## How usage is fetched
 
-| Provider | Credentials | Endpoint |
-| --- | --- | --- |
-| Claude Code | login Keychain item `Claude Code-credentials` (falls back to `~/.claude/.credentials.json`) | `GET api.anthropic.com/api/oauth/usage` |
-| Codex | `~/.codex/auth.json` | `GET chatgpt.com/backend-api/wham/usage` |
+| Provider    | Credentials                                                                                 | Endpoint                                 |
+| ----------- | ------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Claude Code | login Keychain item `Claude Code-credentials` (falls back to `~/.claude/.credentials.json`) | `GET api.anthropic.com/api/oauth/usage`  |
+| Codex       | `~/.codex/auth.json`                                                                        | `GET chatgpt.com/backend-api/wham/usage` |
 
 Claude tokens are **not** refreshed by Runway (the CLI rotates them); if the
 session is expired it asks you to run `claude`. Codex tokens are refreshed and
@@ -46,30 +46,46 @@ For development you can also just `swift run`.
 > The first launch reads the Claude Keychain item; approve **Always Allow** once.
 > The build is ad-hoc signed so the grant persists across launches.
 
-## Release (notarized) & Homebrew
+## Current Release Process (notarized) & Homebrew
 
-```bash
-./Scripts/release.sh   # Developer ID sign + notarize + staple -> build/Runway-<v>.zip
-```
+### One-time setup
 
-`release.sh` builds with the hardened runtime, submits to Apple's notary
-service, staples the ticket, and zips the stapled `.app`. It then prints the
-`version`/`sha256`/`url` to drop into the cask.
-
-One-time setup — store an App Store Connect API key as a notarytool profile:
+Store the App Store Connect API key as a notarytool keychain profile named
+`runway-notary` (the cert is already in the login keychain):
 
 ```bash
 xcrun notarytool store-credentials runway-notary \
-  --key /path/to/AuthKey_XXXXXXXXXX.p8 --key-id XXXXXXXXXX \
-  --issuer xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  --key <path-to-.p8-file> \
+  --key-id <key-id> \
+  --issuer <issuer-id>
 ```
 
-Then publish and update the tap:
+### Cut a release
+
+1. Bump the version (e.g. for `1.1`):
+
+    ```bash
+    APP_VERSION=1.1 ./Scripts/release.sh
+    ```
+
+    `release.sh` builds with the hardened runtime, Developer ID signs, submits to
+    Apple's notary service, staples the ticket, zips the stapled `.app`, and
+    prints the `version`/`sha256`/`url`.
+
+2. Publish the artifact:
+
+    ```bash
+    gh release create v1.1 build/Runway-1.1.zip --repo saadjs/Runway --generate-notes
+    ```
+
+3. Bump `version` **and** `sha256` (each notarized build has a unique hash) in
+   `saadjs/homebrew-tap/Casks/runway.rb`, using the values `release.sh` printed.
+   Keep `dist/runway.rb` in this repo in sync.
+
+Verify before announcing:
 
 ```bash
-gh release create v1.0 build/Runway-1.0.zip --repo saadjs/Runway --generate-notes
-# copy dist/runway.rb -> saadjs/homebrew-tap/Casks/runway.rb (fill in sha256)
-brew install --cask saadjs/tap/runway
+brew update && brew fetch --cask saadjs/tap/runway   # resolves URL + checks sha256
 ```
 
 ## Adding another provider

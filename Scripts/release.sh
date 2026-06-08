@@ -8,9 +8,9 @@
 #     profile (then this script needs no env):
 #
 #       xcrun notarytool store-credentials runway-notary \
-#         --key   ~/.appstoreconnect/private_keys/AuthKey_<key-id>.p8 \
+#         --key   <path-to-AuthKey_XXXX.p8> \
 #         --key-id <key-id> \
-#         --issuer xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx   # from App Store Connect
+#         --issuer <issuer-id>   # all three from App Store Connect
 #
 #   * CI: export NOTARY_KEY_PATH, NOTARY_KEY_ID, NOTARY_ISSUER_ID (see
 #     .github/workflows/release.yml). The Developer ID cert is imported into a
@@ -18,7 +18,14 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SIGN_IDENTITY="${SIGN_IDENTITY:-Developer ID Application: Saad Bash (<team-id>)}"
+# Auto-detect the Developer ID Application identity from the keychain so no team
+# ID is hardcoded. Override by exporting SIGN_IDENTITY.
+SIGN_IDENTITY="${SIGN_IDENTITY:-$(security find-identity -v -p codesigning \
+    | grep -o 'Developer ID Application: .*' | head -1 | sed 's/"$//')}"
+if [ -z "$SIGN_IDENTITY" ]; then
+    echo "No Developer ID Application identity found; set SIGN_IDENTITY." >&2
+    exit 1
+fi
 APP="$ROOT/build/Runway.app"
 
 # notarytool auth: locally use a stored keychain profile (NOTARY_PROFILE);
