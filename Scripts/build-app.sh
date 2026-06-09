@@ -30,15 +30,20 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Runway"
 [ -f "$ROOT/Assets/AppIcon.icns" ] && cp "$ROOT/Assets/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
-# Ship the SwiftPM resource bundle in Resources (Bundle.main.resourceURL),
-# where Bundle.module resolves it and codesign accepts the nested bundle.
+# Ship the SwiftPM resource bundle in Contents/Resources (Bundle.main.resourceURL):
+# the standard, codesign-able location. It can NOT live at the app root where the
+# generated `Bundle.module` accessor looks — codesign rejects unsealed content
+# there — so `Logo.image` resolves it from Resources by hand (see Support.swift).
 RES_BUNDLE="$BIN_DIR/Runway_Runway.bundle"
 DEST_BUNDLE="$APP/Contents/Resources/Runway_Runway.bundle"
-if [ -d "$RES_BUNDLE" ]; then
-    cp -R "$RES_BUNDLE" "$APP/Contents/Resources/"
-    # SwiftPM emits a flat resource folder; give it an Info.plist so it is a
-    # valid, signable macOS bundle (Bundle.module still resolves it).
-    cat > "$DEST_BUNDLE/Info.plist" <<'PLIST'
+if [ ! -d "$RES_BUNDLE" ]; then
+    echo "ERROR: resource bundle not found at $RES_BUNDLE — provider logos would be missing." >&2
+    exit 1
+fi
+cp -R "$RES_BUNDLE" "$APP/Contents/Resources/"
+# SwiftPM emits a flat resource folder; give it an Info.plist so it is a
+# valid, signable macOS bundle.
+cat > "$DEST_BUNDLE/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -50,7 +55,6 @@ if [ -d "$RES_BUNDLE" ]; then
 </dict>
 </plist>
 PLIST
-fi
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -82,5 +86,15 @@ if [ -d "$APP/Contents/Resources/Runway_Runway.bundle" ]; then
     codesign "${SIGN_FLAGS[@]}" "$APP/Contents/Resources/Runway_Runway.bundle"
 fi
 codesign "${SIGN_FLAGS[@]}" --identifier app.runway "$APP"
+
+# Fail the build if the logos the popover renders aren't actually present and the
+# signature isn't valid — this is exactly the breakage that shipped crashing builds.
+for logo in claude codex; do
+    if [ ! -f "$DEST_BUNDLE/$logo.pdf" ]; then
+        echo "ERROR: $logo.pdf missing from $DEST_BUNDLE after packaging." >&2
+        exit 1
+    fi
+done
+codesign --verify --deep --strict "$APP"
 
 echo "Built: $APP (signed: $SIGN_IDENTITY)"
