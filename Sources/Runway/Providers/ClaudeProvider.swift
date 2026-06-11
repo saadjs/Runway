@@ -44,7 +44,15 @@ struct ClaudeProvider: UsageProvider {
 
     /// Re-reads the credential source. Keychain first (macOS default), then the
     /// `~/.claude/.credentials.json` file used on some setups.
+    ///
+    /// The keychain is read via the `security` CLI first because that path never
+    /// prompts (see `Keychain.readGenericPasswordViaSecurityCLI`); the direct
+    /// Security.framework read is a prompting fallback.
     private static func loadCredentials() throws -> Credentials {
+        if let data = Keychain.readGenericPasswordViaSecurityCLI(service: keychainService),
+           let creds = try? parse(data) {
+            return creds
+        }
         if let data = Keychain.readGenericPassword(service: keychainService),
            let creds = try? parse(data) {
             return creds
@@ -75,8 +83,8 @@ struct ClaudeProvider: UsageProvider {
     }
 }
 
-/// In-memory credential cache shared across refreshes so the keychain prompt is
-/// triggered at most once per valid token, not on every poll.
+/// In-memory credential cache shared across refreshes so each poll doesn't spawn
+/// a `security` subprocess (or, on the fallback path, re-trigger a keychain prompt).
 private actor CredentialCache {
     private var cached: ClaudeProvider.Credentials?
     private var validUntil: Date?
