@@ -23,7 +23,7 @@ struct ProviderCardView: View {
             case let .loaded(usage):
                 VStack(spacing: 10) {
                     UsageBarView(title: "5-hour", window: usage.fiveHour, showResetCountdown: showResetCountdown)
-                    UsageBarView(title: "Weekly", window: usage.weekly, showResetCountdown: showResetCountdown)
+                    UsageBarView(title: "Weekly", window: usage.weekly, showResetCountdown: showResetCountdown, includeResetWeekday: true)
                 }
                 .padding(.top, 2)
 

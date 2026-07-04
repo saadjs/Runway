@@ -6,6 +6,8 @@ struct UsageBarView: View {
     let title: String
     let window: UsageWindow?
     var showResetCountdown = true
+    /// Weekly windows span days, so their reset time carries a weekday prefix.
+    var includeResetWeekday = false
 
     var body: some View {
         ProgressView(value: window?.clampedFraction ?? 0) {
@@ -20,6 +22,10 @@ struct UsageBarView: View {
                 if showResetCountdown, let reset = resetCountdown(window?.resetsAt) {
                     Text(" · resets in \(reset)")
                         .foregroundStyle(.secondary)
+                    if let clock = resetClockTime(window?.resetsAt, includeWeekday: includeResetWeekday) {
+                        Text(" (\(clock))")
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }

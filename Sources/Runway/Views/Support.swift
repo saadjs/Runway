@@ -42,3 +42,19 @@ func resetCountdown(_ date: Date?) -> String? {
     if h > 0 { return "\(h)h \(m)m" }
     return "\(m)m"
 }
+
+/// Wall-clock reset time in the user's local timezone. For short (5-hour)
+/// windows this is just the time, e.g. "3:45 PM"; for windows that can span
+/// days (weekly) it's prefixed with the weekday, e.g. "Tue 3:45 PM".
+func resetClockTime(_ date: Date?, includeWeekday: Bool) -> String? {
+    guard let date else { return nil }
+    let formatter = DateFormatter()
+    formatter.locale = .autoupdatingCurrent
+    formatter.timeZone = .autoupdatingCurrent
+    if includeWeekday {
+        formatter.setLocalizedDateFormatFromTemplate("EEE j:mm")
+    } else {
+        formatter.setLocalizedDateFormatFromTemplate("j:mm")
+    }
+    return formatter.string(from: date)
+}
