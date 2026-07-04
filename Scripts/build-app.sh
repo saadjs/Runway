@@ -16,8 +16,8 @@ if [ "$SIGN_IDENTITY" != "-" ]; then
     SIGN_FLAGS+=(--options runtime --timestamp)
 fi
 
-# Marketing version (CFBundleShortVersionString). CI sets this from the git tag.
-APP_VERSION="${APP_VERSION:-1.0}"
+# Marketing version (CFBundleShortVersionString). Override via APP_VERSION.
+APP_VERSION="${APP_VERSION:-1.5}"
 APP_BUILD="${APP_BUILD:-1}"
 
 cd "$ROOT"

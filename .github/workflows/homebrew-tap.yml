@@ -1,0 +1,71 @@
+name: Publish to Homebrew tap
+
+# The .app is built, Developer-ID signed, notarized, stapled, zipped and
+# uploaded to a GitHub Release locally by Scripts/release.sh (notarization
+# needs the Mac's signing identity + notary profile, so it can't run in CI).
+# Once that release is published, this job syncs the cask in saadjs/homebrew-tap
+# so `brew upgrade` picks up the new version — no manual cask edit needed.
+
+on:
+  release:
+    types: [published]
+  # Manual re-run / backfill for an existing tag.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish (e.g. v1.5)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  update-tap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag and version
+        id: v
+        run: |
+          TAG="${{ github.event.release.tag_name || inputs.tag }}"
+          if [ -z "$TAG" ]; then echo "No tag to publish" >&2; exit 1; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download release asset and compute sha256
+        id: asset
+        run: |
+          VERSION="${{ steps.v.outputs.version }}"
+          TAG="${{ steps.v.outputs.tag }}"
+          URL="https://github.com/${{ github.repository }}/releases/download/${TAG}/Runway-${VERSION}.zip"
+          echo "Fetching $URL"
+          curl -fsSL --retry 5 --retry-delay 5 --retry-connrefused -o Runway.zip "$URL"
+          echo "sha256=$(shasum -a 256 Runway.zip | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout tap
+        uses: actions/checkout@v4
+        with:
+          repository: saadjs/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP }}
+          path: tap
+
+      - name: Update cask
+        run: |
+          CASK=tap/Casks/tokens-runway.rb
+          VERSION="${{ steps.v.outputs.version }}"
+          SHA="${{ steps.asset.outputs.sha256 }}"
+          sed -i -E "s/^  version \".*\"/  version \"${VERSION}\"/" "$CASK"
+          sed -i -E "s/^  sha256 \".*\"/  sha256 \"${SHA}\"/" "$CASK"
+          echo "--- updated cask ---"; sed -n '1,10p' "$CASK"
+
+      - name: Commit and push
+        run: |
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- Casks/tokens-runway.rb; then
+            echo "Cask already up to date; nothing to commit."
+            exit 0
+          fi
+          git add Casks/tokens-runway.rb
+          git commit -m "tokens-runway ${{ steps.v.outputs.version }}"
+          git push
