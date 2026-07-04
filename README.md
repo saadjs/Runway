@@ -67,50 +67,16 @@ For development you can also just `swift run`.
 
 ## Release process (notarized) & Homebrew
 
-Notarization needs the Mac's signing identity, so you build and publish the
-release **locally**. Publishing it then triggers a workflow that updates the
-Homebrew cask automatically — you never hand-edit it.
-
-### One-time setup
-
-- Store the App Store Connect API key as a notarytool keychain profile named
-  `runway-notary` (the cert is already in the login keychain):
-
-  ```bash
-  xcrun notarytool store-credentials runway-notary \
-    --key <path-to-.p8-file> --key-id <key-id> --issuer <issuer-id>
-  ```
-
-- Repo secret `HOMEBREW_TAP` — a token with write access to `saadjs/homebrew-tap`,
-  used by `.github/workflows/homebrew-tap.yml` to push the cask update.
-
-### Cut a release
-
-1. Bump `APP_VERSION` in `Scripts/build-app.sh`, then build the notarized zip:
-
-   ```bash
-   ./Scripts/release.sh
-   ```
-
-   It builds with the hardened runtime, Developer ID signs, notarizes, staples,
-   zips the `.app`, and prints the `version`/`sha256`/`url`.
-
-2. Publish the release (this creates the tag):
-
-   ```bash
-   gh release create v1.5 build/Runway-1.5.zip --repo saadjs/Runway --generate-notes
-   ```
-
-Publishing fires the **Publish to Homebrew tap** workflow, which downloads the
-zip, recomputes its sha256, and commits the new `version`/`sha256` to
-`saadjs/homebrew-tap/Casks/tokens-runway.rb`. `brew upgrade` users get it with no
-further action. (Re-run for an existing tag via the workflow's `workflow_dispatch`.)
-
-Verify before announcing:
+Bump `APP_VERSION` in `Scripts/build-app.sh`, then:
 
 ```bash
-brew update && brew fetch --cask saadjs/tap/tokens-runway   # resolves URL + checks sha256
+./Scripts/release.sh                                                    # signs, notarizes, staples, zips
+gh release create v1.5 build/Runway-1.5.zip --repo saadjs/Runway --generate-notes
 ```
+
+Publishing the release triggers `.github/workflows/homebrew-tap.yml`, which
+updates the cask in `saadjs/homebrew-tap` automatically. (Needs the `HOMEBREW_TAP`
+repo secret, and a local `runway-notary` notarytool keychain profile for signing.)
 
 ## Adding another provider
 
