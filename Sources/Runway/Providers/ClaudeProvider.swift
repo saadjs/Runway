@@ -27,11 +27,12 @@ struct ClaudeProvider: UsageProvider {
     private static let cache = CredentialCache()
 
     func fetchUsage() async throws -> ProviderUsage {
-        let candidates = await Self.cache.current(loader: { Self.loadCandidates() })
-        guard !candidates.isEmpty else { throw ProviderError.notSignedIn(cli: "claude") }
-
+        let cliCandidates = await Self.cache.current(loader: { Self.loadCLICandidates() })
         var lastError: Error = ProviderError.tokenExpired(cli: "claude")
-        for creds in candidates {
+        var attemptedTokens = Set<String>()
+
+        for creds in cliCandidates {
+            attemptedTokens.insert(creds.accessToken)
             if creds.isExpired {
                 lastError = ProviderError.tokenExpired(cli: "claude")
                 continue
@@ -43,9 +44,38 @@ struct ClaudeProvider: UsageProvider {
                     weekly: usage.sevenDay?.usageWindow,
                     planLabel: creds.planLabel)
             } catch {
-                // This token didn't work (stale, or a transient error) — remember
-                // why and try the next source before giving up. If every candidate
-                // fails, we surface the last error.
+                guard Self.allowsCredentialFallback(after: error) else {
+                    // A rate limit, network failure, or server error is not evidence
+                    // that the credential is bad. Surface it without touching the
+                    // desktop safe-storage keychain item.
+                    throw error
+                }
+                lastError = error
+                continue
+            }
+        }
+
+        // Reading the Claude app's safe-storage password can show a keychain
+        // prompt. Only touch it when every higher-priority CLI credential is
+        // unavailable, expired, or rejected by the usage endpoint.
+        let candidates = await Self.cache.includingDesktopFallback(
+            primaryCandidates: cliCandidates,
+            loader: { ClaudeDesktopCredentials.load() })
+        guard !candidates.isEmpty else { throw ProviderError.notSignedIn(cli: "claude") }
+
+        for creds in candidates where attemptedTokens.insert(creds.accessToken).inserted {
+            if creds.isExpired {
+                lastError = ProviderError.tokenExpired(cli: "claude")
+                continue
+            }
+            do {
+                let usage = try await ClaudeUsageAPI.fetch(accessToken: creds.accessToken)
+                return ProviderUsage(
+                    fiveHour: usage.fiveHour?.usageWindow,
+                    weekly: usage.sevenDay?.usageWindow,
+                    planLabel: creds.planLabel)
+            } catch {
+                guard Self.allowsCredentialFallback(after: error) else { throw error }
                 lastError = error
                 continue
             }
@@ -68,10 +98,10 @@ struct ClaudeProvider: UsageProvider {
         }
     }
 
-    /// Gathers every credential source we can read, in priority order, de-duped by
-    /// token. Never throws — an empty result means "nothing signed in", which the
-    /// caller maps to the not-signed-in hint.
-    private static func loadCandidates() -> [Credentials] {
+    /// Gathers the CLI credential sources in priority order, de-duped by token.
+    /// The desktop app is deliberately excluded because reading its safe-storage
+    /// key can prompt; `fetchUsage()` loads it lazily only if these candidates fail.
+    private static func loadCLICandidates() -> [Credentials] {
         var result: [Credentials] = []
         var seenTokens = Set<String>()
         func add(_ creds: Credentials?) {
@@ -97,11 +127,6 @@ struct ClaudeProvider: UsageProvider {
             add(try? parse(data))
         }
 
-        // 3: the Claude macOS app's encrypted token cache.
-        for creds in ClaudeDesktopCredentials.load() {
-            add(creds)
-        }
-
         return result
     }
 
@@ -121,28 +146,100 @@ struct ClaudeProvider: UsageProvider {
     static func prettyPlan(_ raw: String) -> String {
         raw.replacingOccurrences(of: "_", with: " ").capitalized
     }
+
+    static func allowsCredentialFallback(after error: Error) -> Bool {
+        if case ProviderError.tokenExpired = error { return true }
+        return false
+    }
 }
 
 /// In-memory credential cache shared across refreshes so each poll doesn't spawn
 /// a `security` subprocess (or, on the desktop-app path, re-trigger a keychain
 /// prompt / re-run the AES decrypt).
-private actor CredentialCache {
+actor CredentialCache {
     private var cached: [ClaudeProvider.Credentials]?
     private var validUntil: Date?
+    private var includesDesktopFallback = false
 
     func current(loader: @Sendable () -> [ClaudeProvider.Credentials]) async
         -> [ClaudeProvider.Credentials]
     {
-        if let cached, let validUntil, Date() < validUntil {
+        if isValid, let cached {
             return cached
         }
         let fresh = loader()
-        cached = fresh
-        // Re-read a little before the soonest real expiry; if none is known, fall
-        // back to a short TTL so we still avoid re-prompting on every refresh.
-        let soonest = fresh.compactMap(\.expiresAt).min()
-        validUntil = soonest?.addingTimeInterval(-60) ?? Date().addingTimeInterval(5 * 60)
+        store(fresh, includesDesktopFallback: false)
         return fresh
+    }
+
+    func includingDesktopFallback(
+        primaryCandidates: [ClaudeProvider.Credentials],
+        loader: @Sendable () -> [ClaudeProvider.Credentials]
+    ) async -> [ClaudeProvider.Credentials] {
+        if isValid, includesDesktopFallback, let cached {
+            return cached
+        }
+
+        let primary = isValid ? (cached ?? primaryCandidates) : primaryCandidates
+        let desktop = loader()
+        var seenTokens = Set<String>()
+        let combined = (primary + desktop).filter {
+            seenTokens.insert($0.accessToken).inserted
+        }
+
+        // Do not remember a failed fallback lookup. A manual refresh immediately
+        // after the user signs in must check the credential sources again.
+        if desktop.isEmpty {
+            if primary.isEmpty {
+                clear()
+            }
+            return combined
+        }
+
+        store(combined, includesDesktopFallback: true)
+        return combined
+    }
+
+    private var isValid: Bool {
+        guard cached != nil, let validUntil else { return false }
+        return Date() < validUntil
+    }
+
+    private func store(
+        _ fresh: [ClaudeProvider.Credentials],
+        includesDesktopFallback: Bool
+    ) {
+        guard !fresh.isEmpty else {
+            clear()
+            return
+        }
+
+        let now = Date()
+        let potentiallyUsable = fresh.filter {
+            $0.expiresAt.map { $0 > now } ?? true
+        }
+        guard !potentiallyUsable.isEmpty else {
+            // An expired-only result should be reloaded on the next refresh so a
+            // newly rotated CLI credential is picked up immediately.
+            clear()
+            return
+        }
+
+        cached = fresh
+        self.includesDesktopFallback = includesDesktopFallback
+
+        // Expired candidates must not shorten the lifetime of a usable fallback.
+        // Re-read a little before the soonest future expiry; if none is known,
+        // use a short TTL to avoid repeated subprocesses and keychain prompts.
+        let soonestUnexpired = potentiallyUsable.compactMap(\.expiresAt).min()
+        validUntil = soonestUnexpired?.addingTimeInterval(-60)
+            ?? now.addingTimeInterval(5 * 60)
+    }
+
+    private func clear() {
+        cached = nil
+        validUntil = nil
+        includesDesktopFallback = false
     }
 }
 

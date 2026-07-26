@@ -8,13 +8,16 @@ Runway is a minimal macOS menu-bar app showing **5-hour** and **weekly** usage l
 
 ```bash
 swift build                        # debug build (fast compile check)
+swift test                         # credential/cache regression tests
 swift run                          # run unbundled for dev (shows in Dock; resources via Bundle.module)
 ./Scripts/build-app.sh release     # build the real menu-bar app -> build/Runway.app (ad-hoc signed)
 open build/Runway.app          # launch it
 ./Scripts/make-icon.sh             # regenerate Assets/AppIcon.icns from the gauge.with.needle SF Symbol
 ```
 
-There is **no test target** and no linter configured. Verify changes by building the app and observing it in the menu bar (the popover is driven via System Events for screenshots during development).
+There is no linter configured. Run `swift test`, then verify app-facing changes by
+building the bundle and observing it in the menu bar (the popover is driven via
+System Events for screenshots during development).
 
 ## Architecture
 
