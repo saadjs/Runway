@@ -42,9 +42,11 @@ struct ClaudeProvider: UsageProvider {
                     fiveHour: usage.fiveHour?.usageWindow,
                     weekly: usage.sevenDay?.usageWindow,
                     planLabel: creds.planLabel)
-            } catch ProviderError.tokenExpired {
-                // This token is stale — try the next source before giving up.
-                lastError = ProviderError.tokenExpired(cli: "claude")
+            } catch {
+                // This token didn't work (stale, or a transient error) — remember
+                // why and try the next source before giving up. If every candidate
+                // fails, we surface the last error.
+                lastError = error
                 continue
             }
         }
@@ -79,10 +81,14 @@ struct ClaudeProvider: UsageProvider {
 
         // 1 & 2: the `claude` CLI (keychain via the non-prompting `security` CLI,
         // then the direct Security.framework read, then the fallback file).
-        if let data = Keychain.readGenericPasswordViaSecurityCLI(service: keychainService) {
-            add(try? parse(data))
-        }
-        if let data = Keychain.readGenericPassword(service: keychainService) {
+        //
+        // The direct read is the one that can trigger a keychain prompt, so we only
+        // fall to it when the `security` CLI path yields nothing parseable — never
+        // when it already succeeded (see `Keychain` and the CLAUDE.md gotcha).
+        if let creds = Keychain.readGenericPasswordViaSecurityCLI(service: keychainService)
+            .flatMap({ try? parse($0) }) {
+            add(creds)
+        } else if let data = Keychain.readGenericPassword(service: keychainService) {
             add(try? parse(data))
         }
         let fileURL = FileManager.default.homeDirectoryForCurrentUser
@@ -186,7 +192,7 @@ enum ClaudeDesktopCredentials {
     /// Extract usable credentials from the decrypted cache, preferring the
     /// `claude_code`-scoped entry and, among matches, the one that expires latest.
     private static func credentials(from root: [String: Any]) -> [ClaudeProvider.Credentials] {
-        let entries = root.compactMap { key, value -> (Bool, ClaudeProvider.Credentials)? in
+        let entries = root.compactMap { key, value -> (isClaudeCode: Bool, creds: ClaudeProvider.Credentials)? in
             guard let entry = value as? [String: Any],
                   let token = entry["token"] as? String, !token.isEmpty
             else { return nil }
@@ -194,21 +200,20 @@ enum ClaudeDesktopCredentials {
                 Date(timeIntervalSince1970: $0 / 1000)
             }
             let plan = (entry["subscriptionType"] as? String).map(ClaudeProvider.prettyPlan)
-            let isClaudeCode = key.contains("claude_code")
             let creds = ClaudeProvider.Credentials(
                 accessToken: token, expiresAt: expiresAt, planLabel: plan)
-            return (isClaudeCode, creds)
+            return (key.contains("claude_code"), creds)
         }
 
         // claude_code-scoped tokens first, latest-expiring within each group.
         return entries
             .sorted { lhs, rhs in
-                if lhs.0 != rhs.0 { return lhs.0 && !rhs.0 }
-                let l = lhs.1.expiresAt ?? .distantPast
-                let r = rhs.1.expiresAt ?? .distantPast
+                if lhs.isClaudeCode != rhs.isClaudeCode { return lhs.isClaudeCode }
+                let l = lhs.creds.expiresAt ?? .distantPast
+                let r = rhs.creds.expiresAt ?? .distantPast
                 return l > r
             }
-            .map(\.1)
+            .map(\.creds)
     }
 }
 

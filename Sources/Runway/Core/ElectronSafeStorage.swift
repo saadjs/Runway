@@ -27,12 +27,11 @@ enum ElectronSafeStorage {
     }
 
     private static func deriveKey(password: String) -> Data? {
-        let passwordBytes = Array(password.utf8)
         var derived = [UInt8](repeating: 0, count: keyLength)
         let status = salt.withUnsafeBytes { saltPtr -> Int32 in
             CCKeyDerivationPBKDF(
                 CCPBKDFAlgorithm(kCCPBKDF2),
-                password, passwordBytes.count,
+                password, password.utf8.count,
                 saltPtr.bindMemory(to: UInt8.self).baseAddress, salt.count,
                 CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA1),
                 iterations,
