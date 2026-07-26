@@ -71,7 +71,7 @@ Bump `APP_VERSION` in `Scripts/build-app.sh`, then:
 
 ```bash
 ./Scripts/release.sh                                                    # signs, notarizes, staples, zips
-gh release create v1.5 build/Runway-1.5.zip --repo saadjs/Runway --generate-notes
+gh release create v1.6 build/Runway-1.6.zip --repo saadjs/Runway --generate-notes
 ```
 
 Publishing the release triggers `.github/workflows/homebrew-tap.yml`, which
