@@ -25,10 +25,7 @@ struct CodexProvider: UsageProvider {
         let usage = try await CodexUsageAPI.fetch(
             accessToken: creds.accessToken,
             accountId: creds.accountId)
-        return ProviderUsage(
-            fiveHour: usage.rateLimit?.primaryWindow?.usageWindow,
-            weekly: usage.rateLimit?.secondaryWindow?.usageWindow,
-            planLabel: usage.planType?.capitalized)
+        return usage.providerUsage
     }
 }
 
@@ -126,7 +123,7 @@ enum CodexAuth {
 
 // MARK: - wham/usage endpoint
 
-private enum CodexUsageAPI {
+enum CodexUsageAPI {
     private static let url = URL(string: "https://chatgpt.com/backend-api/wham/usage")!
 
     struct Response: Decodable {
@@ -136,6 +133,34 @@ private enum CodexUsageAPI {
         enum CodingKeys: String, CodingKey {
             case planType = "plan_type"
             case rateLimit = "rate_limit"
+        }
+
+        /// The API normally returns the 5-hour limit as the primary window and
+        /// the weekly limit as the secondary window. When one limit is disabled,
+        /// however, the remaining limit can be promoted to `primary_window`.
+        /// Prefer the explicit duration so that promotion does not change the
+        /// meaning of the window. Older responses without duration metadata keep
+        /// the original positional mapping.
+        var providerUsage: ProviderUsage {
+            let primary = rateLimit?.primaryWindow
+            let secondary = rateLimit?.secondaryWindow
+            let windows = [primary, secondary].compactMap { $0 }
+            let hasDurationMetadata = windows.contains { $0.limitWindowSeconds != nil }
+
+            let fiveHour: UsageWindow?
+            let weekly: UsageWindow?
+            if hasDurationMetadata {
+                fiveHour = windows.first { $0.kind == .fiveHour }?.usageWindow
+                weekly = windows.first { $0.kind == .weekly }?.usageWindow
+            } else {
+                fiveHour = primary?.usageWindow
+                weekly = secondary?.usageWindow
+            }
+
+            return ProviderUsage(
+                fiveHour: fiveHour,
+                weekly: weekly,
+                planLabel: planType?.capitalized)
         }
 
         struct RateLimit: Decodable {
@@ -151,10 +176,28 @@ private enum CodexUsageAPI {
         struct Window: Decodable {
             let usedPercent: Double?
             let resetAt: Double?
+            let limitWindowSeconds: Double?
 
             enum CodingKeys: String, CodingKey {
                 case usedPercent = "used_percent"
                 case resetAt = "reset_at"
+                case limitWindowSeconds = "limit_window_seconds"
+            }
+
+            enum Kind {
+                case fiveHour
+                case weekly
+            }
+
+            var kind: Kind? {
+                switch limitWindowSeconds {
+                case 5 * 60 * 60:
+                    return .fiveHour
+                case 7 * 24 * 60 * 60:
+                    return .weekly
+                default:
+                    return nil
+                }
             }
 
             /// Map this window to the shared `UsageWindow` model.
