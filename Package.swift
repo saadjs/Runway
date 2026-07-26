@@ -16,4 +16,11 @@ let package = Package(
                 // Pragmatic: avoid fighting strict-concurrency diagnostics in a small app.
                 .swiftLanguageMode(.v5),
             ]),
+        .testTarget(
+            name: "RunwayTests",
+            dependencies: ["Runway"],
+            path: "Tests/RunwayTests",
+            swiftSettings: [
+                .swiftLanguageMode(.v5),
+            ]),
     ])
