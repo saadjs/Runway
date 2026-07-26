@@ -28,14 +28,13 @@ struct RunwayApp: App {
     }
 
     /// "CL61" / "CX" (no number when any usage window is capped — the lock follows) / "CL–".
+    /// The weekly window is used as a fallback while a provider's 5-hour limit
+    /// is unavailable.
     private func tokenText(for provider: any UsageProvider) -> String {
         if case let .loaded(usage) = store.state(for: provider) {
-            if usage.isBlocked { return provider.shortCode }
-            if let five = usage.fiveHour {
-                return "\(provider.shortCode)\(Int(five.usedPercent.rounded()))"
-            }
+            return MenuBarLabel.tokenText(shortCode: provider.shortCode, usage: usage)
         }
-        return "\(provider.shortCode)–"
+        return MenuBarLabel.tokenText(shortCode: provider.shortCode, usage: nil)
     }
 
     private func isBlocked(_ provider: any UsageProvider) -> Bool {

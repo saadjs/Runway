@@ -25,6 +25,18 @@ enum MenuBarLabel {
         }
     }
 
+    /// Formats one provider's menu-bar token. Prefer the rolling 5-hour value,
+    /// but keep the menu bar useful by falling back to weekly when that window
+    /// is temporarily unavailable.
+    static func tokenText(shortCode: String, usage: ProviderUsage?) -> String {
+        guard let usage else { return "\(shortCode)–" }
+        if usage.isBlocked { return shortCode }
+        guard let window = usage.fiveHour ?? usage.weekly else {
+            return "\(shortCode)–"
+        }
+        return "\(shortCode)\(Int(window.usedPercent.rounded()))"
+    }
+
     static func image(tokens: [Token]) -> NSImage {
         let font = NSFont.menuBarFont(ofSize: 0)
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
