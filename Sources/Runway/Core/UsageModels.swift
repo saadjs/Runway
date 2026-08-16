@@ -10,23 +10,29 @@ struct UsageWindow: Equatable, Sendable {
     var clampedFraction: Double { min(max(usedPercent / 100, 0), 1) }
 }
 
-/// The two windows Runway surfaces for a provider.
+/// The windows Runway surfaces for a provider. `monthly` is optional because
+/// only some providers have a monthly cap (OpenCode Go does; Claude and Codex
+/// don't) — a nil window is simply not drawn.
 struct ProviderUsage: Equatable, Sendable {
     var fiveHour: UsageWindow?
     var weekly: UsageWindow?
+    var monthly: UsageWindow?
     /// Optional short plan label (e.g. "Plus", "Pro").
     var planLabel: String?
 
     /// True when the rolling 5-hour window is exhausted: you're blocked until it
-    /// resets, even if the weekly window still has headroom.
+    /// resets, even if the longer windows still have headroom.
     var fiveHourReached: Bool { (fiveHour?.usedPercent ?? 0) >= 100 }
 
     /// True when the weekly window is exhausted: you're blocked until it resets,
-    /// so the 5-hour number is moot. The popover still shows both bars.
+    /// so the 5-hour number is moot. The popover still shows every bar.
     var weeklyReached: Bool { (weekly?.usedPercent ?? 0) >= 100 }
 
+    /// True when a monthly cap is exhausted — the longest lockout of the three.
+    var monthlyReached: Bool { (monthly?.usedPercent ?? 0) >= 100 }
+
     /// Any exhausted window means the provider is currently unusable.
-    var isBlocked: Bool { fiveHourReached || weeklyReached }
+    var isBlocked: Bool { fiveHourReached || weeklyReached || monthlyReached }
 }
 
 /// Result of a refresh for one provider.

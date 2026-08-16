@@ -1,8 +1,8 @@
 <h1 align="center">Runway</h1>
 
 <p align="center">
-  A minimal macOS menu-bar app that shows your <b>5-hour</b> and <b>weekly</b> usage
-  limits for <b>Claude Code</b> and <b>Codex</b>, nothing else.<br>
+  A minimal macOS menu-bar app that shows your <b>5-hour</b>, <b>weekly</b>, and <b>monthly</b> usage
+  limits for <b>Claude Code</b>, <b>Codex</b>, and <b>OpenCode Go</b>, nothing else.<br>
   Native components, official logos, system colors only.
 </p>
 
@@ -19,17 +19,17 @@
 </p>
 
 <p align="center">
-  <img src="docs/popover.png" alt="Runway popover showing Claude and Codex usage" width="320"><br><br>
-  <img src="docs/menubar.png" alt="Runway menu-bar label" width="220">
+  <img src="docs/popover.png" alt="Runway popover showing Claude, Codex, and OpenCode Go usage" width="320"><br><br>
+  <img src="docs/menubar.png" alt="Runway menu-bar label" width="290">
 </p>
 
 ## What it does
 
-- Reads the credentials the `claude` and `codex` CLIs already store, so there's
-  nothing to log into.
-- Shows each provider's rolling 5-hour and 7-day windows with a percentage and an
-  optional reset countdown.
-- The menu-bar label shows the highest current 5-hour usage at a glance.
+- Reads the credentials the `claude`, `codex`, and `opencode` CLIs already store,
+  so there's nothing to log into.
+- Shows each provider's rolling 5-hour and 7-day windows — plus a monthly one
+  where the provider has it — with a percentage and an optional reset countdown.
+- The menu-bar label shows every provider's current 5-hour usage at a glance.
 - Refreshes on launch, on a configurable interval (default 5 min), and on demand.
 - Settings (⌘,): launch at login, refresh interval (presets or a custom value),
   per-provider show/hide, and a toggle for the reset countdown.
@@ -40,10 +40,16 @@
 | ----------- | ------------------------------------------------------------------------------------------- | ---------------------------------------- |
 | Claude Code | login Keychain item `Claude Code-credentials` (falls back to `~/.claude/.credentials.json`) | `GET api.anthropic.com/api/oauth/usage`  |
 | Codex       | `~/.codex/auth.json`                                                                        | `GET chatgpt.com/backend-api/wham/usage` |
+| OpenCode Go | `~/.local/share/opencode/auth.json` (or `OPENCODE_API_KEY`)                                 | `GET opencode.ai/zen/go/v1/usage`        |
 
 Claude tokens are **not** refreshed by Runway (the CLI rotates them); if the
 session is expired it asks you to run `claude`. Codex tokens are refreshed and
-written back to `auth.json`, matching what the CLI does.
+written back to `auth.json`, matching what the CLI does. OpenCode Go uses a
+long-lived API key, so there is nothing to refresh.
+
+OpenCode Go's limits are dollar caps — $12 per 5 hours, $30 weekly, $60 monthly —
+so its card shows a third **Monthly** bar. Claude and Codex have no monthly cap
+and keep two bars.
 
 ## Install
 
@@ -97,8 +103,8 @@ Everything else (refresh loop, UI, menu-bar label) picks it up automatically.
 Sources/Runway/
   App/        RunwayApp.swift        MenuBarExtra + accessory policy
   Core/       UsageModels, UsageProvider, ProviderRegistry, Keychain
-  Providers/  ClaudeProvider, CodexProvider
+  Providers/  ClaudeProvider, CodexProvider, OpenCodeProvider
   Store/      UsageStore, AppSettings    refresh loop + state, preferences
   Views/      MenuView, ProviderCardView, UsageBarView, SettingsView, Support
-  Resources/  claude.pdf, codex.pdf      official logos (template-tinted)
+  Resources/  claude.pdf, codex.pdf, opencode.pdf   official logos (template-tinted)
 ```

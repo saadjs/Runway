@@ -11,6 +11,7 @@ let package = Package(
             resources: [
                 .copy("Resources/claude.pdf"),
                 .copy("Resources/codex.pdf"),
+                .copy("Resources/opencode.pdf"),
             ],
             swiftSettings: [
                 // Pragmatic: avoid fighting strict-concurrency diagnostics in a small app.

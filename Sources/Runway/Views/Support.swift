@@ -43,18 +43,32 @@ func resetCountdown(_ date: Date?) -> String? {
     return "\(m)m"
 }
 
-/// Wall-clock reset time in the user's local timezone. For short (5-hour)
-/// windows this is just the time, e.g. "3:45 PM"; for windows that can span
-/// days (weekly) it's prefixed with the weekday, e.g. "Tue 3:45 PM".
-func resetClockTime(_ date: Date?, includeWeekday: Bool) -> String? {
+/// How much calendar context a window's reset time needs to be unambiguous.
+enum ResetTimeStyle {
+    /// Within a day (5-hour): "3:45 PM".
+    case time
+    /// Within a week (weekly): "Tue 3:45 PM".
+    case weekday
+    /// Weeks out (monthly), where a weekday alone is ambiguous: "Sep 15, 3:45 PM".
+    case date
+}
+
+/// Wall-clock reset time in the user's local timezone.
+func resetClockTime(_ date: Date?, style: ResetTimeStyle) -> String? {
     guard let date else { return nil }
+    switch style {
+    case .time: return localized("j:mm", date)
+    case .weekday: return localized("EEE j:mm", date)
+    // A combined date+time template renders as "Sep 15 at 3:45 PM", which overruns
+    // the row inside the 300pt popover — join the two parts instead.
+    case .date: return "\(localized("MMM d", date)), \(localized("j:mm", date))"
+    }
+}
+
+private func localized(_ template: String, _ date: Date) -> String {
     let formatter = DateFormatter()
     formatter.locale = .autoupdatingCurrent
     formatter.timeZone = .autoupdatingCurrent
-    if includeWeekday {
-        formatter.setLocalizedDateFormatFromTemplate("EEE j:mm")
-    } else {
-        formatter.setLocalizedDateFormatFromTemplate("j:mm")
-    }
+    formatter.setLocalizedDateFormatFromTemplate(template)
     return formatter.string(from: date)
 }

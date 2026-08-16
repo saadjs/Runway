@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// One provider as a native `GroupBox`: official logo + name + plan in the
-/// header, the 5-hour and weekly bars (or a loading / error state) in the body.
+/// header, a bar per usage window (or a loading / error state) in the body.
 struct ProviderCardView: View {
     let provider: any UsageProvider
     let state: ProviderState
@@ -23,7 +23,11 @@ struct ProviderCardView: View {
             case let .loaded(usage):
                 VStack(spacing: 10) {
                     UsageBarView(title: "5-hour", window: usage.fiveHour, showResetCountdown: showResetCountdown)
-                    UsageBarView(title: "Weekly", window: usage.weekly, showResetCountdown: showResetCountdown, includeResetWeekday: true)
+                    UsageBarView(title: "Weekly", window: usage.weekly, showResetCountdown: showResetCountdown, resetStyle: .weekday)
+                    // Only providers with a monthly cap (OpenCode Go) draw a third bar.
+                    if let monthly = usage.monthly {
+                        UsageBarView(title: "Monthly", window: monthly, showResetCountdown: showResetCountdown, resetStyle: .date)
+                    }
                 }
                 .padding(.top, 2)
 

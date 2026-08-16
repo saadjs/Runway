@@ -26,12 +26,12 @@ enum MenuBarLabel {
     }
 
     /// Formats one provider's menu-bar token. Prefer the rolling 5-hour value,
-    /// but keep the menu bar useful by falling back to weekly when that window
-    /// is temporarily unavailable.
+    /// but keep the menu bar useful by falling back to the longer windows when
+    /// that one is temporarily unavailable.
     static func tokenText(shortCode: String, usage: ProviderUsage?) -> String {
         guard let usage else { return "\(shortCode)–" }
         if usage.isBlocked { return shortCode }
-        guard let window = usage.fiveHour ?? usage.weekly else {
+        guard let window = usage.fiveHour ?? usage.weekly ?? usage.monthly else {
             return "\(shortCode)–"
         }
         return "\(shortCode)\(Int(window.usedPercent.rounded()))"
