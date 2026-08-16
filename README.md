@@ -20,7 +20,7 @@
 
 <p align="center">
   <img src="docs/popover.png" alt="Runway popover showing Claude, Codex, and OpenCode Go usage" width="320"><br><br>
-  <img src="docs/menubar.png" alt="Runway menu-bar label" width="220">
+  <img src="docs/menubar.png" alt="Runway menu-bar label" width="290">
 </p>
 
 ## What it does
