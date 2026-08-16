@@ -17,7 +17,7 @@ if [ "$SIGN_IDENTITY" != "-" ]; then
 fi
 
 # Marketing version (CFBundleShortVersionString). Override via APP_VERSION.
-APP_VERSION="${APP_VERSION:-1.7}"
+APP_VERSION="${APP_VERSION:-1.8}"
 APP_BUILD="${APP_BUILD:-1}"
 
 cd "$ROOT"

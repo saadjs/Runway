@@ -44,15 +44,20 @@ struct ProviderCardView: View {
                 Logo.image(provider.logoResource)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 15, height: 15)
+                    .frame(width: 14, height: 14)
                     .foregroundStyle(.primary)
                 Text(provider.displayName)
-                Spacer()
+                    .font(.headline)
+                Spacer(minLength: 8)
                 if case let .loaded(usage) = state, let plan = usage.planLabel {
-                    Text(plan).foregroundStyle(.secondary)
+                    Text(plan)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
             }
-            .font(.headline)
+            .lineLimit(1)
+            .padding(.leading, -4)
+            .padding(.trailing, 4)
         }
     }
 }

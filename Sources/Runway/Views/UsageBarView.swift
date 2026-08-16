@@ -13,20 +13,23 @@ struct UsageBarView: View {
         ProgressView(value: window?.clampedFraction ?? 0) {
             Text(title)
         } currentValueLabel: {
-            HStack(spacing: 0) {
-                Text(percentText)
-                    .monospacedDigit()
-                if window != nil {
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                if let window {
+                    Text("\(Int(window.usedPercent.rounded()))%")
+                        .monospacedDigit()
                     Text(" used").foregroundStyle(.secondary)
-                }
-                if showResetCountdown, let reset = resetCountdown(window?.resetsAt) {
-                    Text(" · resets in \(reset)")
-                        .foregroundStyle(.secondary)
-                    if let clock = resetClockTime(window?.resetsAt, style: resetStyle) {
-                        Text(" (\(clock))")
+                    if showResetCountdown, let reset = resetCountdown(window.resetsAt) {
+                        Text(" · resets in \(reset)")
                             .foregroundStyle(.secondary)
+                        if let clock = resetClockTime(window.resetsAt, style: resetStyle) {
+                            Text(" (\(clock))")
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                } else {
+                    Text("No data").foregroundStyle(.secondary)
                 }
+                Spacer(minLength: 0)
             }
         }
         .font(.callout)
@@ -34,11 +37,6 @@ struct UsageBarView: View {
         // The monthly row is the longest; shrink a hair rather than ellipsize it.
         .minimumScaleFactor(0.9)
         .tint(tint)
-    }
-
-    private var percentText: String {
-        guard let window else { return "—" }
-        return "\(Int(window.usedPercent.rounded()))%"
     }
 
     /// Semantic tint so usage is scannable at a glance: green with headroom,

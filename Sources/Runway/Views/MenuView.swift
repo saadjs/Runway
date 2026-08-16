@@ -12,13 +12,12 @@ struct MenuView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(spacing: 10) {
                 Text("Runway").font(.headline)
-                Spacer()
+                Spacer(minLength: 8)
                 Button { openSettings() } label: {
                     Image(systemName: "gearshape")
                 }
-                .buttonStyle(.borderless)
                 .help("Settings")
                 .keyboardShortcut(",", modifiers: .command)
                 Button {
@@ -26,11 +25,13 @@ struct MenuView: View {
                 } label: {
                     Image(systemName: "arrow.clockwise")
                 }
-                .buttonStyle(.borderless)
                 .disabled(store.isRefreshing)
                 .help("Refresh now")
                 .keyboardShortcut("r", modifiers: .command)
             }
+            .buttonStyle(.borderless)
+            .imageScale(.medium)
+            .frame(height: 18)
 
             if visibleProviders.isEmpty {
                 Text("All providers hidden — enable them in Settings.")
@@ -47,19 +48,21 @@ struct MenuView: View {
 
             Divider()
 
-            HStack {
+            HStack(alignment: .firstTextBaseline) {
                 Text(footerText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
+                Spacer(minLength: 8)
                 Button("Quit") { NSApplication.shared.terminate(nil) }
-                    .buttonStyle(.borderless)
-                    .font(.caption)
+                    .buttonStyle(.plain)
+                    .help("Quit Runway")
                     .keyboardShortcut("q", modifiers: .command)
             }
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
-        .padding(14)
-        .frame(width: 300)
+        .padding(.horizontal, 14)
+        .padding(.top, 14)
+        .padding(.bottom, 30)
+        .frame(width: 320)
         .onAppear { Task { await store.refresh() } }
     }
 
