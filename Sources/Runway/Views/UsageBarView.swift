@@ -6,8 +6,8 @@ struct UsageBarView: View {
     let title: String
     let window: UsageWindow?
     var showResetCountdown = true
-    /// Weekly windows span days, so their reset time carries a weekday prefix.
-    var includeResetWeekday = false
+    /// Longer windows need more calendar context in their reset time.
+    var resetStyle: ResetTimeStyle = .time
 
     var body: some View {
         ProgressView(value: window?.clampedFraction ?? 0) {
@@ -22,7 +22,7 @@ struct UsageBarView: View {
                 if showResetCountdown, let reset = resetCountdown(window?.resetsAt) {
                     Text(" · resets in \(reset)")
                         .foregroundStyle(.secondary)
-                    if let clock = resetClockTime(window?.resetsAt, includeWeekday: includeResetWeekday) {
+                    if let clock = resetClockTime(window?.resetsAt, style: resetStyle) {
                         Text(" (\(clock))")
                             .foregroundStyle(.secondary)
                     }
@@ -30,6 +30,9 @@ struct UsageBarView: View {
             }
         }
         .font(.callout)
+        .lineLimit(1)
+        // The monthly row is the longest; shrink a hair rather than ellipsize it.
+        .minimumScaleFactor(0.9)
         .tint(tint)
     }
 

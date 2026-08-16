@@ -17,7 +17,7 @@ if [ "$SIGN_IDENTITY" != "-" ]; then
 fi
 
 # Marketing version (CFBundleShortVersionString). Override via APP_VERSION.
-APP_VERSION="${APP_VERSION:-1.6}"
+APP_VERSION="${APP_VERSION:-1.7}"
 APP_BUILD="${APP_BUILD:-1}"
 
 cd "$ROOT"
@@ -89,7 +89,7 @@ codesign "${SIGN_FLAGS[@]}" --identifier app.runway "$APP"
 
 # Fail the build if the logos the popover renders aren't actually present and the
 # signature isn't valid — this is exactly the breakage that shipped crashing builds.
-for logo in claude codex; do
+for logo in claude codex opencode; do
     if [ ! -f "$DEST_BUNDLE/$logo.pdf" ]; then
         echo "ERROR: $logo.pdf missing from $DEST_BUNDLE after packaging." >&2
         exit 1

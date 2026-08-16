@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Runway is a minimal macOS menu-bar app showing **5-hour** and **weekly** usage limits for **Claude Code** and **Codex** only. SwiftPM executable, macOS 13+, SwiftUI `MenuBarExtra`, menu-bar only (no Dock icon).
+Runway is a minimal macOS menu-bar app showing **5-hour**, **weekly**, and (where the provider has one) **monthly** usage limits for **Claude Code**, **Codex**, and **OpenCode Go** only. SwiftPM executable, macOS 13+, SwiftUI `MenuBarExtra`, menu-bar only (no Dock icon).
 
 ## Commands
 
@@ -23,7 +23,7 @@ System Events for screenshots during development).
 
 Data flows: **provider -> store -> views + menu-bar label**.
 
-- **`Core/UsageProvider`** — the protocol every monitored app implements (`id`, `displayName`, `shortCode`, `logoResource`, `fetchUsage() async throws -> ProviderUsage`). `ProviderUsage` holds a `fiveHour` and `weekly` `UsageWindow` (each a 0–100 `usedPercent` + optional `resetsAt`). Both providers normalize to this shape.
+- **`Core/UsageProvider`** — the protocol every monitored app implements (`id`, `displayName`, `shortCode`, `logoResource`, `fetchUsage() async throws -> ProviderUsage`). `ProviderUsage` holds a `fiveHour`, `weekly`, and optional `monthly` `UsageWindow` (each a 0–100 `usedPercent` + optional `resetsAt`). Every provider normalizes to this shape; a nil window is simply not drawn, so only OpenCode Go shows a third bar.
 - **`Core/ProviderRegistry.all`** — the single list of active providers. This is the modularity seam.
 - **`Store/UsageStore`** (`@MainActor`, `.shared`) — owns `[providerID: ProviderState]`, fetches all providers concurrently in a `TaskGroup`, and drives refreshes. Started from `AppDelegate.applicationDidFinishLaunching`, not from a view's `onAppear`. The refresh cadence comes from `AppSettings` (re-scheduled live via a Combine subscription).
 - **`Store/AppSettings`** (`@MainActor`, `.shared`) — user preferences persisted in `UserDefaults`: refresh interval, reset-countdown visibility, per-provider show/hide, and launch-at-login (backed by `SMAppService.mainApp`, not UserDefaults). Single source of truth read by the views and `UsageStore`.
@@ -44,10 +44,12 @@ Launch-at-login (`SMAppService.mainApp.register()`) only works from the **bundle
 
 - **Claude** (`ClaudeProvider`): reads the login Keychain item `Claude Code-credentials` (JSON under `claudeAiOauth`), falling back to `~/.claude/.credentials.json`. Usage: `GET api.anthropic.com/api/oauth/usage` with `Authorization: Bearer`, `anthropic-beta: oauth-2025-04-20`, `User-Agent: claude-code/<v>`. Response `five_hour`/`seven_day` -> `{utilization (0-100), resets_at ISO8601}`.
 - **Codex** (`CodexProvider`): reads `~/.codex/auth.json` (`tokens.access_token` + `tokens.account_id`). Usage: `GET chatgpt.com/backend-api/wham/usage` with `Bearer` + `ChatGPT-Account-Id`. Response `rate_limit.primary_window`/`secondary_window` -> `{used_percent (0-100), reset_at epoch-seconds}`.
+- **OpenCode Go** (`OpenCodeProvider`): reads the `opencode` CLI's `~/.local/share/opencode/auth.json` (`opencode-go.key`, honouring `XDG_DATA_HOME`), or `OPENCODE_API_KEY`. Usage: `GET opencode.ai/zen/go/v1/usage` with `Authorization: Bearer`. Response `usage.rolling`/`weekly`/`monthly` -> `{percent (0-100), resetsAt ISO8601}`. Go's limits are dollar caps ($12 per 5 h, $30 weekly, $60 monthly), so `rolling` is the 5-hour window and Go is the only provider that fills `ProviderUsage.monthly`.
 
 ### Token refresh policy (deliberate, do not "fix")
 
 - **Codex self-refreshes** on 401 via `auth.openai.com/oauth/token` and **writes the rotated tokens back to `auth.json`** (merging, preserving other keys) — matches what the CLI does, keeps both in sync.
+- **OpenCode Go has nothing to refresh** — it's a long-lived API key, so a 401 means revoked/rotated and Runway asks the user to run `opencode auth login`.
 - **Claude is never refreshed by Runway.** The CLI rotates its refresh token, so refreshing here could invalidate the user's `claude` login. On expiry, re-read the keychain (to pick up what the CLI refreshed) and otherwise surface a "run `claude`" hint.
 
 ## Critical gotchas

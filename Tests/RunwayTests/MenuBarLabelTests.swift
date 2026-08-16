@@ -22,6 +22,17 @@ final class MenuBarLabelTests: XCTestCase {
             "CX19")
     }
 
+    func testFallsBackToMonthlyWindowWhenShorterWindowsAreUnavailable() {
+        let usage = ProviderUsage(
+            fiveHour: nil,
+            weekly: nil,
+            monthly: UsageWindow(usedPercent: 44, resetsAt: nil))
+
+        XCTAssertEqual(
+            MenuBarLabel.tokenText(shortCode: "OC", usage: usage),
+            "OC44")
+    }
+
     func testShowsDashWhenNoWindowIsAvailable() {
         let usage = ProviderUsage(fiveHour: nil, weekly: nil)
 
