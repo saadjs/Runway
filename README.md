@@ -19,17 +19,17 @@
 </p>
 
 <p align="center">
-  <img src="docs/popover.png" alt="Runway popover showing Claude and Codex usage" width="320"><br><br>
+  <img src="docs/popover.png" alt="Runway popover showing Claude, Codex, and OpenCode Go usage" width="320"><br><br>
   <img src="docs/menubar.png" alt="Runway menu-bar label" width="220">
 </p>
 
 ## What it does
 
-- Reads the credentials the `claude` and `codex` CLIs already store, so there's
-  nothing to log into.
-- Shows each provider's rolling 5-hour and 7-day windows with a percentage and an
-  optional reset countdown.
-- The menu-bar label shows the highest current 5-hour usage at a glance.
+- Reads the credentials the `claude`, `codex`, and `opencode` CLIs already store,
+  so there's nothing to log into.
+- Shows each provider's rolling 5-hour and 7-day windows — plus a monthly one
+  where the provider has it — with a percentage and an optional reset countdown.
+- The menu-bar label shows every provider's current 5-hour usage at a glance.
 - Refreshes on launch, on a configurable interval (default 5 min), and on demand.
 - Settings (⌘,): launch at login, refresh interval (presets or a custom value),
   per-provider show/hide, and a toggle for the reset countdown.
