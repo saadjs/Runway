@@ -91,8 +91,8 @@ final class OpenCodeUsageTests: XCTestCase {
         XCTAssertNil(OpenCodeAuth.apiKey(fromAuthJSON: Data("not json".utf8)))
     }
 
-    /// A window the API flags as not-ok is dropped, not drawn as 0% used.
-    func testNonOKWindowIsDroppedRatherThanShownEmpty() throws {
+    /// An unavailable window is dropped, not drawn as 0% used.
+    func testUnavailableWindowIsDroppedRatherThanShownEmpty() throws {
         let usage = try decode("""
         {
           "usage": {
@@ -104,6 +104,27 @@ final class OpenCodeUsageTests: XCTestCase {
 
         XCTAssertNil(usage.fiveHour)
         XCTAssertEqual(usage.weekly?.usedPercent, 40)
+    }
+
+    func testRateLimitedRollingWindowIsShownAsExhausted() throws {
+        let usage = try decode("""
+        {
+          "usage": {
+            "rolling": {
+              "status": "rate-limited",
+              "percent": 100,
+              "resetsAt": "2026-08-23T06:28:12.457Z"
+            },
+            "weekly": { "status": "ok", "percent": 73 },
+            "monthly": { "status": "ok", "percent": 59 }
+          }
+        }
+        """).providerUsage
+
+        XCTAssertEqual(usage.fiveHour?.usedPercent, 100)
+        XCTAssertTrue(usage.fiveHourReached)
+        XCTAssertTrue(usage.isBlocked)
+        XCTAssertEqual(MenuBarLabel.tokenText(shortCode: "OC", usage: usage), "OC")
     }
 
     func testKeyIsTrimmedSoTheAuthHeaderStaysWellFormed() throws {

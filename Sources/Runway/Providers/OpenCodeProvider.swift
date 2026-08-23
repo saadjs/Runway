@@ -85,11 +85,17 @@ enum OpenCodeUsageAPI {
             let percent: Double?
             let resetsAt: String?
 
-            /// Map this window to the shared `UsageWindow` model. A window the API
-            /// doesn't report as "ok" is dropped rather than drawn: its `percent` is
-            /// not a real reading, and an empty bar would look like plenty of headroom.
+            /// Map this window to the shared `UsageWindow` model. `rate-limited`
+            /// means the window is exhausted even though it is not `ok`; the API's
+            /// percent is normally 100, but the status is authoritative here.
+            /// Other non-OK statuses are dropped because their percent is not a
+            /// usable reading.
             var usageWindow: UsageWindow? {
-                guard status == nil || status?.lowercased() == "ok" else { return nil }
+                let normalizedStatus = status?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if normalizedStatus == "rate-limited" || normalizedStatus == "rate_limited" {
+                    return UsageWindow(usedPercent: 100, resetsAt: Response.parseDate(resetsAt))
+                }
+                guard normalizedStatus == nil || normalizedStatus == "ok" else { return nil }
                 guard let percent else { return nil }
                 return UsageWindow(usedPercent: percent, resetsAt: Response.parseDate(resetsAt))
             }
