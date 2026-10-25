@@ -1,15 +1,10 @@
 name: Publish to Homebrew tap
 
-# The .app is built, Developer-ID signed, notarized, stapled, zipped and
-# uploaded to a GitHub Release locally by Scripts/release.sh (notarization
-# needs the Mac's signing identity + notary profile, so it can't run in CI).
-# Once that release is published, this job syncs the cask in saadjs/homebrew-tap
-# so `brew upgrade` picks up the new version — no manual cask edit needed.
+# Syncs the cask in saadjs/homebrew-tap once a release built locally by Scripts/release.sh is published.
 
 on:
   release:
     types: [published]
-  # Manual re-run / backfill for an existing tag.
   workflow_dispatch:
     inputs:
       tag:

@@ -1,5 +1,4 @@
-# Canonical copy lives in saadjs/homebrew-tap as Casks/tokens-runway.rb. Kept here for
-# reference; release.sh prints the version/sha256 to bump on each release.
+# Reference copy; the canonical cask is Casks/tokens-runway.rb in saadjs/homebrew-tap.
 # frozen_string_literal: true
 
 cask "tokens-runway" do

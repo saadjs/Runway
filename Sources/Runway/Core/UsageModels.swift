@@ -1,48 +1,47 @@
 import Foundation
 
-/// A single rate-limit window (e.g. the rolling 5-hour or 7-day window).
 struct UsageWindow: Equatable, Sendable {
-    /// Percent of the limit consumed, 0...100.
     let usedPercent: Double
-    /// When the window resets, if known.
     let resetsAt: Date?
 
     var clampedFraction: Double { min(max(usedPercent / 100, 0), 1) }
 }
 
-/// The windows Runway surfaces for a provider. `monthly` is optional because
-/// only some providers have a monthly cap (OpenCode Go does; Claude and Codex
-/// don't) — a nil window is simply not drawn.
 struct ProviderUsage: Equatable, Sendable {
     var fiveHour: UsageWindow?
     var weekly: UsageWindow?
     var monthly: UsageWindow?
-    /// Optional short plan label (e.g. "Plus", "Pro").
     var planLabel: String?
 
-    /// True when the rolling 5-hour window is exhausted: you're blocked until it
-    /// resets, even if the longer windows still have headroom.
     var fiveHourReached: Bool { (fiveHour?.usedPercent ?? 0) >= 100 }
 
-    /// True when the weekly window is exhausted: you're blocked until it resets,
-    /// so the 5-hour number is moot. The popover still shows every bar.
     var weeklyReached: Bool { (weekly?.usedPercent ?? 0) >= 100 }
 
-    /// True when a monthly cap is exhausted — the longest lockout of the three.
     var monthlyReached: Bool { (monthly?.usedPercent ?? 0) >= 100 }
 
-    /// Any exhausted window means the provider is currently unusable.
     var isBlocked: Bool { fiveHourReached || weeklyReached || monthlyReached }
 }
 
-/// Result of a refresh for one provider.
+enum ISO8601Timestamp {
+    private static let fractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    private static let whole = ISO8601DateFormatter()
+
+    static func date(from string: String?) -> Date? {
+        guard let string else { return nil }
+        return fractional.date(from: string) ?? whole.date(from: string)
+    }
+}
+
 enum ProviderState: Equatable, Sendable {
     case loading
     case loaded(ProviderUsage)
     case failed(String)
 }
 
-/// Errors that map to a friendly, actionable message.
 enum ProviderError: LocalizedError {
     case notSignedIn(cli: String)
     case tokenExpired(cli: String)

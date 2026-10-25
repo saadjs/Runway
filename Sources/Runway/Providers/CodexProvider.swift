@@ -1,9 +1,5 @@
 import Foundation
 
-/// Codex usage via the ChatGPT backend, reusing the credentials the `codex` CLI
-/// stores in `~/.codex/auth.json`. On a 401 we refresh the OAuth token and write
-/// the rotated tokens back to `auth.json` (matching what the CLI itself does), so
-/// the CLI and Runway stay in sync.
 struct CodexProvider: UsageProvider {
     let id = "codex"
     let displayName = "Codex"
@@ -15,7 +11,6 @@ struct CodexProvider: UsageProvider {
         do {
             return try await Self.fetch(with: creds)
         } catch ProviderError.tokenExpired {
-            // Refresh once, persist, retry.
             creds = try await CodexAuth.refresh(creds)
             return try await Self.fetch(with: creds)
         }
@@ -61,8 +56,6 @@ enum CodexAuth {
         return Credentials(accessToken: access, refreshToken: refresh, accountId: accountId)
     }
 
-    /// Refresh via OpenAI's token endpoint, then merge the new tokens back into
-    /// auth.json preserving any other keys the CLI keeps there.
     static func refresh(_ creds: Credentials) async throws -> Credentials {
         guard !creds.refreshToken.isEmpty else { throw ProviderError.tokenExpired(cli: "codex") }
 
@@ -105,7 +98,6 @@ enum CodexAuth {
         try? out.write(to: url, options: .atomic)
     }
 
-    /// Fallback: pull `chatgpt_account_id` from the id_token JWT claims.
     private static func accountIdFromIDToken(_ idToken: String?) -> String? {
         guard let idToken else { return nil }
         let parts = idToken.split(separator: ".")
@@ -135,16 +127,11 @@ enum CodexUsageAPI {
             case rateLimit = "rate_limit"
         }
 
-        /// The API normally returns the 5-hour limit as the primary window and
-        /// the weekly limit as the secondary window. When one limit is disabled,
-        /// however, the remaining limit can be promoted to `primary_window`.
-        /// Prefer the explicit duration so that promotion does not change the
-        /// meaning of the window. Older responses without duration metadata keep
-        /// the original positional mapping.
         var providerUsage: ProviderUsage {
             let primary = rateLimit?.primaryWindow
             let secondary = rateLimit?.secondaryWindow
             let windows = [primary, secondary].compactMap { $0 }
+            // A lone limit can be promoted to `primary_window`, so classify by duration when present.
             let hasDurationMetadata = windows.contains { $0.limitWindowSeconds != nil }
 
             let fiveHour: UsageWindow?
@@ -200,7 +187,6 @@ enum CodexUsageAPI {
                 }
             }
 
-            /// Map this window to the shared `UsageWindow` model.
             var usageWindow: UsageWindow? {
                 guard let used = usedPercent else { return nil }
                 return UsageWindow(usedPercent: used, resetsAt: resetAt.map { Date(timeIntervalSince1970: $0) })

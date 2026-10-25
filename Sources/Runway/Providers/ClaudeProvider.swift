@@ -1,22 +1,6 @@
 import Foundation
 
-/// Claude Code usage via the OAuth usage endpoint. Runway reuses whatever
-/// credentials it can find, in priority order:
-///
-///   1. the `claude` CLI's login-keychain item ("Claude Code-credentials"),
-///   2. the CLI's `~/.claude/.credentials.json` fallback file,
-///   3. the **Claude macOS app**'s encrypted token cache in its Application
-///      Support `config.json` (so Runway works even when the CLI isn't set up).
-///
-/// The account-level usage endpoint returns the same 5-hour / 7-day windows
-/// regardless of which of these tokens is used, so any valid one works. We try
-/// them in order and fall through to the next on a 401, which also covers the
-/// case where the CLI's stored token is present but stale.
-///
-/// We deliberately do NOT refresh Claude tokens ourselves: the CLI and the
-/// desktop app both rotate their refresh tokens, so refreshing here could
-/// invalidate the user's real login. When every candidate is expired we surface
-/// a "run `claude`" (or "open the Claude app") hint instead.
+/// Never refreshes tokens: the CLI and desktop app rotate refresh tokens, so refreshing here could sign the user out.
 struct ClaudeProvider: UsageProvider {
     let id = "claude"
     let displayName = "Claude"
@@ -27,7 +11,9 @@ struct ClaudeProvider: UsageProvider {
     private static let cache = CredentialCache()
 
     func fetchUsage() async throws -> ProviderUsage {
-        let cliCandidates = await Self.cache.current(loader: { Self.loadCLICandidates() })
+        let cliCandidates = await Self.cache.current(
+            sourceVersion: Self.credentialsVersion(),
+            loader: { Self.loadCLICandidates() })
         var lastError: Error = ProviderError.tokenExpired(cli: "claude")
         var attemptedTokens = Set<String>()
 
@@ -45,9 +31,6 @@ struct ClaudeProvider: UsageProvider {
                     planLabel: creds.planLabel)
             } catch {
                 guard Self.allowsCredentialFallback(after: error) else {
-                    // A rate limit, network failure, or server error is not evidence
-                    // that the credential is bad. Surface it without touching the
-                    // desktop safe-storage keychain item.
                     throw error
                 }
                 lastError = error
@@ -55,9 +38,7 @@ struct ClaudeProvider: UsageProvider {
             }
         }
 
-        // Reading the Claude app's safe-storage password can show a keychain
-        // prompt. Only touch it when every higher-priority CLI credential is
-        // unavailable, expired, or rejected by the usage endpoint.
+        // Reading the desktop app's safe-storage password can prompt, so only after every CLI credential failed.
         let candidates = await Self.cache.includingDesktopFallback(
             primaryCandidates: cliCandidates,
             loader: { ClaudeDesktopCredentials.load() })
@@ -91,16 +72,11 @@ struct ClaudeProvider: UsageProvider {
         let planLabel: String?
 
         var isExpired: Bool {
-            // Unknown expiry: assume valid and let a 401 surface real expiry,
-            // rather than rejecting a usable token (and bypassing the cache) outright.
             guard let expiresAt else { return false }
             return Date() >= expiresAt
         }
     }
 
-    /// Gathers the CLI credential sources in priority order, de-duped by token.
-    /// The desktop app is deliberately excluded because reading its safe-storage
-    /// key can prompt; `fetchUsage()` loads it lazily only if these candidates fail.
     private static func loadCLICandidates() -> [Credentials] {
         var result: [Credentials] = []
         var seenTokens = Set<String>()
@@ -109,25 +85,39 @@ struct ClaudeProvider: UsageProvider {
             result.append(creds)
         }
 
-        // 1 & 2: the `claude` CLI (keychain via the non-prompting `security` CLI,
-        // then the direct Security.framework read, then the fallback file).
-        //
-        // The direct read is the one that can trigger a keychain prompt, so we only
-        // fall to it when the `security` CLI path yields nothing parseable — never
-        // when it already succeeded (see `Keychain` and the CLAUDE.md gotcha).
         if let creds = Keychain.readGenericPasswordViaSecurityCLI(service: keychainService)
             .flatMap({ try? parse($0) }) {
             add(creds)
         } else if let data = Keychain.readGenericPassword(service: keychainService) {
             add(try? parse(data))
         }
-        let fileURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".claude/.credentials.json")
-        if let data = try? Data(contentsOf: fileURL) {
+        if let data = try? Data(contentsOf: credentialsFileURL) {
             add(try? parse(data))
         }
 
         return result
+    }
+
+    private static var credentialsFileURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude/.credentials.json")
+    }
+
+    /// Changes on re-login so another account's still-valid token isn't kept. Keyed on the desktop token blob,
+    /// not `config.json`'s mtime, which churns with UI state.
+    private static func credentialsVersion() -> String {
+        let dates = [
+            Keychain.modificationDate(service: keychainService),
+            modificationDate(of: credentialsFileURL),
+        ]
+        .map { $0.map { "\($0.timeIntervalSince1970)" } ?? "-" }
+        let desktop = ClaudeDesktopCredentials.tokenCacheBlob().map { "\($0.hashValue)" } ?? "-"
+        return (dates + [desktop]).joined(separator: "|")
+    }
+
+    private static func modificationDate(of url: URL) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate]
+            as? Date
     }
 
     private static func parse(_ data: Data) throws -> Credentials {
@@ -153,22 +143,22 @@ struct ClaudeProvider: UsageProvider {
     }
 }
 
-/// In-memory credential cache shared across refreshes so each poll doesn't spawn
-/// a `security` subprocess (or, on the desktop-app path, re-trigger a keychain
-/// prompt / re-run the AES decrypt).
 actor CredentialCache {
     private var cached: [ClaudeProvider.Credentials]?
     private var validUntil: Date?
     private var includesDesktopFallback = false
+    private var sourceVersion: String?
 
-    func current(loader: @Sendable () -> [ClaudeProvider.Credentials]) async
-        -> [ClaudeProvider.Credentials]
-    {
-        if isValid, let cached {
+    func current(
+        sourceVersion: String? = nil,
+        loader: @Sendable () -> [ClaudeProvider.Credentials]
+    ) async -> [ClaudeProvider.Credentials] {
+        if isValid, sourceVersion == self.sourceVersion, let cached {
             return cached
         }
         let fresh = loader()
         store(fresh, includesDesktopFallback: false)
+        self.sourceVersion = sourceVersion
         return fresh
     }
 
@@ -187,8 +177,6 @@ actor CredentialCache {
             seenTokens.insert($0.accessToken).inserted
         }
 
-        // Do not remember a failed fallback lookup. A manual refresh immediately
-        // after the user signs in must check the credential sources again.
         if desktop.isEmpty {
             if primary.isEmpty {
                 clear()
@@ -219,8 +207,6 @@ actor CredentialCache {
             $0.expiresAt.map { $0 > now } ?? true
         }
         guard !potentiallyUsable.isEmpty else {
-            // An expired-only result should be reloaded on the next refresh so a
-            // newly rotated CLI credential is picked up immediately.
             clear()
             return
         }
@@ -228,9 +214,6 @@ actor CredentialCache {
         cached = fresh
         self.includesDesktopFallback = includesDesktopFallback
 
-        // Expired candidates must not shorten the lifetime of a usable fallback.
-        // Re-read a little before the soonest future expiry; if none is known,
-        // use a short TTL to avoid repeated subprocesses and keychain prompts.
         let soonestUnexpired = potentiallyUsable.compactMap(\.expiresAt).min()
         validUntil = soonestUnexpired?.addingTimeInterval(-60)
             ?? now.addingTimeInterval(5 * 60)
@@ -245,14 +228,6 @@ actor CredentialCache {
 
 // MARK: - Claude macOS app token cache
 
-/// Reads the Claude desktop app's OAuth token out of its Electron `safeStorage`
-/// blob in `~/Library/Application Support/Claude/config.json`.
-///
-/// The blob decrypts to a dictionary keyed by `<account>:<org>:<host>:<scopes>:`;
-/// we want the entry carrying the `claude_code` scope (the same token kind the
-/// CLI uses for the usage endpoint). Reading the "Claude Safe Storage" keychain
-/// password prompts the user once — Runway isn't on that item's ACL — and an
-/// "Always Allow" binds to Runway's code signature.
 enum ClaudeDesktopCredentials {
     private static let safeStorageService = "Claude Safe Storage"
 
@@ -265,29 +240,23 @@ enum ClaudeDesktopCredentials {
         return credentials(from: root)
     }
 
-    private static func configURL() -> URL {
+    private static var configURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/Claude/config.json")
     }
 
-    /// The newer `oauth:tokenCacheV2` is preferred; the older key is a fallback.
-    private static func tokenCacheBlob() -> String? {
-        guard let data = try? Data(contentsOf: configURL()),
+    static func tokenCacheBlob() -> String? {
+        guard let data = try? Data(contentsOf: configURL),
               let cfg = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
         return (cfg["oauth:tokenCacheV2"] as? String) ?? (cfg["oauth:tokenCache"] as? String)
     }
 
-    /// The desktop app didn't store this item through `/usr/bin/security`, so the
-    /// CLI read would need a prompt (which the 2s-timeout helper would dismiss).
-    /// Go straight to the direct read, which shows a real, grantable prompt.
     private static func safeStoragePassword() -> String? {
         Keychain.readGenericPassword(service: safeStorageService)
             .flatMap { String(data: $0, encoding: .utf8) }
     }
 
-    /// Extract usable credentials from the decrypted cache, preferring the
-    /// `claude_code`-scoped entry and, among matches, the one that expires latest.
     private static func credentials(from root: [String: Any]) -> [ClaudeProvider.Credentials] {
         let entries = root.compactMap { key, value -> (isClaudeCode: Bool, creds: ClaudeProvider.Credentials)? in
             guard let entry = value as? [String: Any],
@@ -302,7 +271,6 @@ enum ClaudeDesktopCredentials {
             return (key.contains("claude_code"), creds)
         }
 
-        // claude_code-scoped tokens first, latest-expiring within each group.
         return entries
             .sorted { lhs, rhs in
                 if lhs.isClaudeCode != rhs.isClaudeCode { return lhs.isClaudeCode }
@@ -337,21 +305,10 @@ private enum ClaudeUsageAPI {
                 case resetsAt = "resets_at"
             }
 
-            /// Map this window to the shared `UsageWindow` model.
             var usageWindow: UsageWindow? {
                 guard let used = utilization else { return nil }
-                return UsageWindow(usedPercent: used, resetsAt: Response.parseDate(resetsAt))
+                return UsageWindow(usedPercent: used, resetsAt: ISO8601Timestamp.date(from: resetsAt))
             }
-        }
-
-        private static func parseDate(_ string: String?) -> Date? {
-            guard let string else { return nil }
-            let f = ISO8601DateFormatter()
-            f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            return f.date(from: string) ?? {
-                f.formatOptions = [.withInternetDateTime]
-                return f.date(from: string)
-            }()
         }
     }
 

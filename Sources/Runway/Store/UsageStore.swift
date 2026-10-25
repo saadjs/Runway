@@ -2,7 +2,6 @@ import Combine
 import Foundation
 import SwiftUI
 
-/// Owns provider state and drives refreshes (on launch, on a timer, and manually).
 @MainActor
 final class UsageStore: ObservableObject {
     static let shared = UsageStore()
@@ -15,7 +14,6 @@ final class UsageStore: ObservableObject {
 
     private var timer: Timer?
     private var cancellables: Set<AnyCancellable> = []
-    /// Skip refreshes (other than the manual button) within this window.
     private let minimumRefreshInterval: TimeInterval = 30
 
     init() {
@@ -25,9 +23,7 @@ final class UsageStore: ObservableObject {
     func start() {
         Task { await refresh() }
         scheduleTimer(minutes: AppSettings.shared.refreshIntervalMinutes)
-        // Reschedule when the user changes the refresh cadence in Settings.
-        // `@Published` emits in `willSet` (before the property updates), so use the
-        // value the publisher delivers rather than re-reading the stale property.
+        // `@Published` emits in `willSet`, so use the delivered value, not the stale property.
         AppSettings.shared.$refreshIntervalMinutes
             .dropFirst()
             .sink { [weak self] minutes in self?.scheduleTimer(minutes: minutes) }
@@ -40,11 +36,10 @@ final class UsageStore: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { await self?.refresh() }
         }
+        timer?.tolerance = interval * 0.1
     }
 
-    /// Refreshes all providers. Throttled to avoid rate-limiting the upstream
-    /// usage endpoints when the popover is opened repeatedly; pass `force: true`
-    /// (the manual Refresh button) to bypass the throttle.
+    /// Non-forced refreshes are throttled to stay under Anthropic's rate limit.
     func refresh(force: Bool = false) async {
         guard !isRefreshing else { return }
         if !force, let last = lastUpdated, Date().timeIntervalSince(last) < minimumRefreshInterval {
@@ -66,7 +61,7 @@ final class UsageStore: ObservableObject {
                 }
             }
             for await (id, state) in group {
-                states[id] = state
+                if states[id] != state { states[id] = state }
             }
         }
         lastUpdated = Date()

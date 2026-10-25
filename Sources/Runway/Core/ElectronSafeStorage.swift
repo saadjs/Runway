@@ -1,22 +1,14 @@
 import CommonCrypto
 import Foundation
 
-/// Decrypts values written by Electron's `safeStorage` API on macOS — the format
-/// the Claude desktop app uses for its `oauth:tokenCache` in `config.json`.
-///
-/// Electron/Chromium's macOS scheme: a `v10` magic prefix, then AES-128-CBC over
-/// the ciphertext with a key derived from a keychain password ("<App> Safe
-/// Storage") via PBKDF2-HMAC-SHA1 (salt `saltysalt`, 1003 iterations, 16-byte
-/// key) and a fixed IV of sixteen space bytes. PKCS#7 padding.
+/// Electron `safeStorage` on macOS: `v10` prefix, AES-128-CBC, PBKDF2-SHA1 key, IV of sixteen spaces.
 enum ElectronSafeStorage {
     private static let magic = Data("v10".utf8)
     private static let salt = Data("saltysalt".utf8)
     private static let iterations: UInt32 = 1003
     private static let keyLength = 16
-    private static let iv = Data(repeating: 0x20, count: 16) // sixteen spaces
+    private static let iv = Data(repeating: 0x20, count: 16)
 
-    /// Decrypt a base64-encoded `v10…` blob using the app's Safe Storage password.
-    /// Returns nil if the input isn't the expected format or decryption fails.
     static func decrypt(base64 blob: String, password: String) -> Data? {
         guard let raw = Data(base64Encoded: blob), raw.count > magic.count,
               raw.prefix(magic.count) == magic

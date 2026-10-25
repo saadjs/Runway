@@ -6,20 +6,16 @@ OUT_DIR="$ROOT/Assets"
 WORK="$(mktemp -d)"
 mkdir -p "$OUT_DIR"
 
-# Render the symbol onto a rounded-square background at 1024px.
 cat > "$WORK/render.swift" <<'SWIFT'
 import AppKit
 let size: CGFloat = 1024
 let path = CommandLine.arguments[1]
 let img = NSImage(size: NSSize(width: size, height: size))
 img.lockFocus()
-// Background: light rounded square (native app-icon silhouette).
 let inset: CGFloat = size * 0.06
 let rect = NSRect(x: inset, y: inset, width: size - inset * 2, height: size - inset * 2)
 NSColor.white.setFill()
 NSBezierPath(roundedRect: rect, xRadius: size * 0.22, yRadius: size * 0.22).fill()
-// Symbol, centered. SF Symbol template images draw in their own (black) ink;
-// recolor to dark gray via a sourceAtop fill on an offscreen image.
 let config = NSImage.SymbolConfiguration(pointSize: size * 0.46, weight: .regular)
 if let sym = NSImage(systemSymbolName: "gauge.with.needle", accessibilityDescription: nil)?
     .withSymbolConfiguration(config) {

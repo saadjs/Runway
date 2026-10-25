@@ -1,12 +1,9 @@
 import SwiftUI
 
-/// One usage window as a native linear `ProgressView`: title above the bar,
-/// percentage and reset countdown below. Uses the system accent tint only.
 struct UsageBarView: View {
     let title: String
     let window: UsageWindow?
     var showResetCountdown = true
-    /// Longer windows need more calendar context in their reset time.
     var resetStyle: ResetTimeStyle = .time
 
     var body: some View {
@@ -34,14 +31,10 @@ struct UsageBarView: View {
         }
         .font(.callout)
         .lineLimit(1)
-        // The monthly row is the longest; shrink a hair rather than ellipsize it.
         .minimumScaleFactor(0.9)
         .tint(tint)
     }
 
-    /// Semantic tint so usage is scannable at a glance: green with headroom,
-    /// orange as it fills, red when nearly exhausted. Falls back to the system
-    /// accent when there's no data.
     private var tint: Color {
         guard let window else { return .accentColor }
         switch window.usedPercent {

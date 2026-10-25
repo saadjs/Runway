@@ -1,17 +1,10 @@
 import Foundation
 
-/// Environment variables as the user's *shell* sees them.
-///
-/// Runway ships as a menu-bar/login-item app launched by launchd or Finder, which
-/// does not source `.zshrc`/`.zprofile` — so a variable the CLIs rely on (an XDG
-/// override, an API key) is simply absent from `ProcessInfo`. Falling back to a
-/// login shell recovers it. Results are cached: at most one subprocess per
-/// variable per launch, and only when the process environment came up empty.
+/// Env vars as the login shell sees them; apps launched by launchd don't source the user's profile.
 enum LoginShellEnv {
     private static let lock = NSLock()
     private static var cache: [String: String?] = [:]
 
-    /// The process environment first, then the login shell. Nil if unset or blank.
     static func value(_ name: String) -> String? {
         if let direct = ProcessInfo.processInfo.environment[name]?.nonBlank { return direct }
 
@@ -45,8 +38,6 @@ enum LoginShellEnv {
         process.terminationHandler = { _ in exited.signal() }
         do { try process.run() } catch { return nil }
 
-        // Read concurrently: a profile that prints a lot could fill the pipe buffer
-        // and deadlock a shell we're waiting on.
         let box = OutputBox()
         let drained = DispatchSemaphore(value: 0)
         DispatchQueue.global().async {
@@ -67,7 +58,6 @@ enum LoginShellEnv {
         var data = Data()
     }
 
-    /// `SHELL` is unset under launchd, so fall back to the account's shell.
     private static func loginShellPath() -> String {
         if let shell = ProcessInfo.processInfo.environment["SHELL"]?.nonBlank,
            FileManager.default.isExecutableFile(atPath: shell) {
@@ -82,7 +72,6 @@ enum LoginShellEnv {
 }
 
 extension String {
-    /// The string trimmed, or nil if it holds nothing but whitespace.
     var nonBlank: String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed

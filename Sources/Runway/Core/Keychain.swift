@@ -1,15 +1,8 @@
 import Foundation
 import Security
 
-/// Read-only access to a macOS generic-password keychain item.
 enum Keychain {
-    /// Reads the secret by shelling out to `/usr/bin/security`.
-    ///
-    /// The `claude` CLI stores its credentials *through* the `security` tool, which
-    /// puts `/usr/bin/security` on the item's ACL — so reads via this path never
-    /// trigger a keychain prompt, and keep working after the CLI rotates the token
-    /// and rewrites the item (which resets the ACL and would otherwise invalidate
-    /// any "Always Allow" grant given to Runway's own code signature).
+    /// Never prompts for the `claude` CLI's item: the CLI writes it via `/usr/bin/security`, putting that binary on its ACL.
     static func readGenericPasswordViaSecurityCLI(
         service: String, timeout: TimeInterval = 2.0
     ) -> Data? {
@@ -25,9 +18,6 @@ enum Keychain {
         do { try process.run() } catch { return nil }
 
         guard exited.wait(timeout: .now() + timeout) != .timedOut else {
-            // Still running means the ACL unexpectedly required a prompt. SIGTERM
-            // is enough to dismiss it; the caller falls back to the direct
-            // Security.framework read.
             process.terminate()
             return nil
         }
@@ -40,10 +30,21 @@ enum Keychain {
         return data.isEmpty ? nil : data
     }
 
-    /// Direct Security.framework read. Reading another app's item this way triggers
-    /// an access prompt; "Always Allow" binds the grant to Runway's code signature
-    /// but is lost whenever the owning app rewrites the item. Kept as a fallback
-    /// for items the `security` CLI cannot read without UI.
+    /// Attributes aren't ACL-protected, so this never prompts.
+    static func modificationDate(service: String) -> Date? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecReturnAttributes as String: true,
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        guard status == errSecSuccess else { return nil }
+        return (item as? [String: Any])?[kSecAttrModificationDate as String] as? Date
+    }
+
+    /// Prompts when Runway isn't on the item's ACL; a fallback only.
     static func readGenericPassword(service: String) -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,

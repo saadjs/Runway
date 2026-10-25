@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// The popover: a native stack of provider group boxes with a title bar and footer.
 struct MenuView: View {
     @ObservedObject var store: UsageStore
     @ObservedObject private var settings = AppSettings.shared
@@ -73,8 +72,6 @@ struct MenuView: View {
 
     private var footerText: String {
         guard let updated = store.lastUpdated else { return "Updating…" }
-        let f = DateFormatter()
-        f.timeStyle = .short
-        return "Updated \(f.string(from: updated))"
+        return "Updated \(updated.formatted(date: .omitted, time: .shortened))"
     }
 }

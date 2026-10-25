@@ -24,7 +24,6 @@ final class OpenCodeUsageTests: XCTestCase {
         XCTAssertEqual(usage.fiveHour?.resetsAt, formatter.date(from: "2026-08-16T07:25:27.719Z"))
     }
 
-    /// Reset timestamps without fractional seconds still parse.
     func testParsesResetWithoutFractionalSeconds() throws {
         let usage = try decode("""
         { "usage": { "rolling": { "percent": 5, "resetsAt": "2026-08-16T07:25:27Z" } } }
@@ -44,8 +43,6 @@ final class OpenCodeUsageTests: XCTestCase {
         XCTAssertFalse(usage.isBlocked)
     }
 
-    /// The monthly cap is the longest lockout, and the one most easily hit:
-    /// an exhausted month must read as blocked even with 5-hour/weekly headroom.
     func testExhaustedMonthlyCapReadsAsBlocked() throws {
         let usage = try decode("""
         {
@@ -91,7 +88,6 @@ final class OpenCodeUsageTests: XCTestCase {
         XCTAssertNil(OpenCodeAuth.apiKey(fromAuthJSON: Data("not json".utf8)))
     }
 
-    /// An unavailable window is dropped, not drawn as 0% used.
     func testUnavailableWindowIsDroppedRatherThanShownEmpty() throws {
         let usage = try decode("""
         {
@@ -143,8 +139,6 @@ final class OpenCodeUsageTests: XCTestCase {
                 .appendingPathComponent(".local/share/opencode/auth.json").path)
     }
 
-    /// The packaged app doesn't inherit the shell profile, so the login shell is
-    /// the fallback for vars the CLI relies on.
     func testLoginShellEnvRecoversAProfileVariable() throws {
         LoginShellEnv.resetCacheForTesting()
         XCTAssertNil(LoginShellEnv.value("RUNWAY_DEFINITELY_UNSET_VAR"))

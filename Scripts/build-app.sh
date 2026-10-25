@@ -1,23 +1,18 @@
 #!/bin/bash
-# Build Runway.app: a menu-bar-only (LSUIElement) bundle, ad-hoc signed so
-# macOS keychain "Always Allow" grants persist across launches.
+# Build the menu-bar-only Runway.app; ad-hoc signed unless SIGN_IDENTITY is set.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CONFIG="${1:-release}"
 APP="$ROOT/build/Runway.app"
 
-# Signing identity. Defaults to ad-hoc ("-") for local dev. For distribution,
-# release.sh sets SIGN_IDENTITY to the Developer ID Application cert, which also
-# enables the hardened runtime + secure timestamp required for notarization.
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 SIGN_FLAGS=(--force --sign "$SIGN_IDENTITY")
 if [ "$SIGN_IDENTITY" != "-" ]; then
     SIGN_FLAGS+=(--options runtime --timestamp)
 fi
 
-# Marketing version (CFBundleShortVersionString). Override via APP_VERSION.
-APP_VERSION="${APP_VERSION:-1.9}"
+APP_VERSION="${APP_VERSION:-1.10}"
 APP_BUILD="${APP_BUILD:-1}"
 
 cd "$ROOT"
@@ -30,10 +25,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Runway"
 [ -f "$ROOT/Assets/AppIcon.icns" ] && cp "$ROOT/Assets/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
-# Ship the SwiftPM resource bundle in Contents/Resources (Bundle.main.resourceURL):
-# the standard, codesign-able location. It can NOT live at the app root where the
-# generated `Bundle.module` accessor looks — codesign rejects unsealed content
-# there — so `Logo.image` resolves it from Resources by hand (see Support.swift).
+# Must live in Contents/Resources: codesign rejects unsealed content at the app root.
 RES_BUNDLE="$BIN_DIR/Runway_Runway.bundle"
 DEST_BUNDLE="$APP/Contents/Resources/Runway_Runway.bundle"
 if [ ! -d "$RES_BUNDLE" ]; then
@@ -41,9 +33,14 @@ if [ ! -d "$RES_BUNDLE" ]; then
     exit 1
 fi
 cp -R "$RES_BUNDLE" "$APP/Contents/Resources/"
-# SwiftPM emits a flat resource folder; give it an Info.plist so it is a
-# valid, signable macOS bundle.
-cat > "$DEST_BUNDLE/Info.plist" <<'PLIST'
+# Flat bundles (older SwiftPM) need a root Info.plist to sign; Contents/ layouts (6.4+) must not have one.
+if [ -d "$DEST_BUNDLE/Contents" ]; then
+    RES_PLIST="$DEST_BUNDLE/Contents/Info.plist"
+else
+    RES_PLIST="$DEST_BUNDLE/Info.plist"
+fi
+if [ ! -f "$RES_PLIST" ]; then
+cat > "$RES_PLIST" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -55,6 +52,7 @@ cat > "$DEST_BUNDLE/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+fi
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -79,19 +77,15 @@ PLIST
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $APP_VERSION" \
     -c "Set :CFBundleVersion $APP_BUILD" "$APP/Contents/Info.plist"
 
-# A stable identity keeps keychain grants from re-prompting each launch (ad-hoc
-# for dev; Developer ID for releases, which also has a stable designated
-# requirement). Sign the nested resource bundle first, then the app (inside-out).
-if [ -d "$APP/Contents/Resources/Runway_Runway.bundle" ]; then
-    codesign "${SIGN_FLAGS[@]}" "$APP/Contents/Resources/Runway_Runway.bundle"
-fi
+# Sign inside-out: the nested resource bundle first.
+codesign "${SIGN_FLAGS[@]}" "$DEST_BUNDLE"
 codesign "${SIGN_FLAGS[@]}" --identifier app.runway "$APP"
 
-# Fail the build if the logos the popover renders aren't actually present and the
-# signature isn't valid — this is exactly the breakage that shipped crashing builds.
+LOGO_DIR="$DEST_BUNDLE"
+[ -d "$DEST_BUNDLE/Contents/Resources" ] && LOGO_DIR="$DEST_BUNDLE/Contents/Resources"
 for logo in claude codex opencode; do
-    if [ ! -f "$DEST_BUNDLE/$logo.pdf" ]; then
-        echo "ERROR: $logo.pdf missing from $DEST_BUNDLE after packaging." >&2
+    if [ ! -f "$LOGO_DIR/$logo.pdf" ]; then
+        echo "ERROR: $logo.pdf missing from $LOGO_DIR after packaging." >&2
         exit 1
     fi
 done

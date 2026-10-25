@@ -1,14 +1,8 @@
 import AppKit
 
-/// Renders the menu-bar label as a single template `NSImage`.
-///
-/// `MenuBarExtra` only reliably renders an `Image` plus one `Text` — additional
-/// sibling views, `ForEach`, and inline-in-`Text` images are dropped. To mix the
-/// gauge glyph, per-provider text, and SF Symbol locks we composite them into one
-/// template image, which the menu bar tints for light/dark automatically.
+/// One template image: `MenuBarExtra` labels silently drop anything beyond an `Image` + one `Text`.
 enum MenuBarLabel {
-    /// One provider's compact token, e.g. ("CL61", locked: false).
-    struct Token {
+    struct Token: Equatable {
         let text: String
         let locked: Bool
     }
@@ -25,9 +19,6 @@ enum MenuBarLabel {
         }
     }
 
-    /// Formats one provider's menu-bar token. Prefer the rolling 5-hour value,
-    /// but keep the menu bar useful by falling back to the longer windows when
-    /// that one is temporarily unavailable.
     static func tokenText(shortCode: String, usage: ProviderUsage?) -> String {
         guard let usage else { return "\(shortCode)–" }
         if usage.isBlocked { return shortCode }
@@ -37,8 +28,19 @@ enum MenuBarLabel {
         return "\(shortCode)\(Int(window.usedPercent.rounded()))"
     }
 
-    static func image(tokens: [Token]) -> NSImage {
+    @MainActor private static var lastRendered: (tokens: [Token], fontSize: CGFloat, image: NSImage)?
+
+    @MainActor static func image(tokens: [Token]) -> NSImage {
         let font = NSFont.menuBarFont(ofSize: 0)
+        if let lastRendered, lastRendered.tokens == tokens, lastRendered.fontSize == font.pointSize {
+            return lastRendered.image
+        }
+        let image = render(tokens: tokens, font: font)
+        lastRendered = (tokens, font.pointSize, image)
+        return image
+    }
+
+    private static func render(tokens: [Token], font: NSFont) -> NSImage {
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.black]
         let symbolConfig = NSImage.SymbolConfiguration(pointSize: font.pointSize, weight: .regular)
 
@@ -49,7 +51,6 @@ enum MenuBarLabel {
             return image
         }
 
-        // Build (piece, leading gap) pairs.
         var laidOut: [(piece: Piece, gap: CGFloat)] = []
         if let gauge = symbol("gauge.with.needle") {
             laidOut.append((.image(gauge), 0))
@@ -66,22 +67,22 @@ enum MenuBarLabel {
         let width = laidOut.reduce(0) { $0 + $1.gap + $1.piece.size.width }
         guard width > 0 else { return NSImage(size: NSSize(width: 1, height: height)) }
 
-        let image = NSImage(size: NSSize(width: ceil(width), height: height))
-        image.lockFocus()
-        var x: CGFloat = 0
-        for (piece, gap) in laidOut {
-            x += gap
-            let size = piece.size
-            let y = (height - size.height) / 2
-            switch piece {
-            case let .image(symbolImage):
-                symbolImage.draw(in: NSRect(x: x, y: y, width: size.width, height: size.height))
-            case let .text(string):
-                string.draw(at: NSPoint(x: x, y: y))
+        let image = NSImage(size: NSSize(width: ceil(width), height: height), flipped: false) { _ in
+            var x: CGFloat = 0
+            for (piece, gap) in laidOut {
+                x += gap
+                let size = piece.size
+                let y = (height - size.height) / 2
+                switch piece {
+                case let .image(symbolImage):
+                    symbolImage.draw(in: NSRect(x: x, y: y, width: size.width, height: size.height))
+                case let .text(string):
+                    string.draw(at: NSPoint(x: x, y: y))
+                }
+                x += size.width
             }
-            x += size.width
+            return true
         }
-        image.unlockFocus()
         image.isTemplate = true
         return image
     }

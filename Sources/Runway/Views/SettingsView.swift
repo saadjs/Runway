@@ -1,18 +1,12 @@
 import SwiftUI
 
-/// Identifier for the settings `Window` scene (opened from the popover gear button).
 enum SettingsWindow { static let id = "settings" }
 
-/// The Settings window: a native grouped `Form` of app preferences.
 struct SettingsView: View {
     @ObservedObject private var settings = AppSettings.shared
     private let providers = ProviderRegistry.all
 
-    /// Sentinel tag for the "Custom…" picker row (no real interval equals it).
     private static let customTag = -1
-    /// Whether the custom stepper is revealed. Seeded from the persisted value
-    /// (a non-preset means we're already in custom mode) and held while the user
-    /// dials the stepper so it doesn't snap shut when they cross a preset value.
     @State private var customMode = false
 
     var body: some View {

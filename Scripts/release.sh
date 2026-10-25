@@ -1,25 +1,10 @@
 #!/bin/bash
-# Build, Developer-ID sign, notarize, staple, and zip Runway.app for
-# distribution via Homebrew. Produces build/Runway-<version>.zip plus the
-# sha256 and a ready-to-paste cask `url`/`sha256`/`version`.
-#
-# Auth:
-#   * Local: store the App Store Connect API key once as a notarytool keychain
-#     profile (then this script needs no env):
-#
-#       xcrun notarytool store-credentials runway-notary \
-#         --key   <path-to-AuthKey_XXXX.p8> \
-#         --key-id <key-id> \
-#         --issuer <issuer-id>   # all three from App Store Connect
-#
-#   * CI: export NOTARY_KEY_PATH, NOTARY_KEY_ID, NOTARY_ISSUER_ID (see
-#     .github/workflows/release.yml). The Developer ID cert is imported into a
-#     temporary keychain there.
+# Build, Developer ID sign, notarize, staple, and zip Runway.app for Homebrew.
+# Notary auth: a `runway-notary` profile (xcrun notarytool store-credentials runway-notary
+# --key <p8> --key-id <id> --issuer <id>), or NOTARY_KEY_PATH/NOTARY_KEY_ID/NOTARY_ISSUER_ID.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-# Auto-detect the Developer ID Application identity from the keychain so no team
-# ID is hardcoded. Override by exporting SIGN_IDENTITY.
 SIGN_IDENTITY="${SIGN_IDENTITY:-$(security find-identity -v -p codesigning \
     | grep -o 'Developer ID Application: .*' | head -1 | sed 's/"$//')}"
 if [ -z "$SIGN_IDENTITY" ]; then
@@ -28,15 +13,12 @@ if [ -z "$SIGN_IDENTITY" ]; then
 fi
 APP="$ROOT/build/Runway.app"
 
-# notarytool auth: locally use a stored keychain profile (NOTARY_PROFILE);
-# in CI pass the App Store Connect API key directly (NOTARY_KEY_PATH/ID/ISSUER).
 if [ -n "${NOTARY_KEY_PATH:-}" ]; then
     NOTARY_AUTH=(--key "$NOTARY_KEY_PATH" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID")
 else
     NOTARY_AUTH=(--keychain-profile "${NOTARY_PROFILE:-runway-notary}")
 fi
 
-# Version from the bundle's CFBundleShortVersionString (set in build-app.sh).
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
     "$ROOT/build/Runway.app/Contents/Info.plist" 2>/dev/null || true)"
 

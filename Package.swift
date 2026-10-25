@@ -14,7 +14,6 @@ let package = Package(
                 .copy("Resources/opencode.pdf"),
             ],
             swiftSettings: [
-                // Pragmatic: avoid fighting strict-concurrency diagnostics in a small app.
                 .swiftLanguageMode(.v5),
             ]),
         .testTarget(

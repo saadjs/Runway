@@ -2,35 +2,33 @@ import AppKit
 import SwiftUI
 
 enum Logo {
-    /// The SwiftPM resource bundle, located *without* the generated `Bundle.module`
-    /// accessor. That accessor `fatalError`s when it can't find the bundle, and in a
-    /// packaged `.app` it looks only at the bundle root — never `Contents/Resources`,
-    /// where the bundle actually ships (it can't live at the root: codesign rejects
-    /// unsealed content there). So routing logo lookups through `Bundle.module` crashes
-    /// the app the moment the popover opens. We resolve it by hand and tolerate a miss.
+    /// Not `Bundle.module`: its accessor only checks the app root and `fatalError`s in a packaged app.
     private static let resources: Bundle? = {
         let name = "Runway_Runway.bundle"
         let candidates = [
-            Bundle.main.resourceURL,        // packaged .app -> Contents/Resources
-            Bundle.main.bundleURL,          // `swift run` -> dir beside the executable
+            Bundle.main.resourceURL,
+            Bundle.main.bundleURL,
         ].compactMap { $0?.appendingPathComponent(name) }
         return candidates.lazy.compactMap(Bundle.init(url:)).first
     }()
 
-    /// Loads a bundled vector logo as a template image so SwiftUI's
-    /// `foregroundStyle` tints it to match the native control color.
-    /// Falls back to an SF Symbol if the resource is missing — never traps.
-    static func image(_ name: String) -> Image {
+    @MainActor private static var loaded: [String: Image] = [:]
+
+    @MainActor static func image(_ name: String) -> Image {
+        if let image = loaded[name] { return image }
+        let image: Image
         if let url = resources?.url(forResource: name, withExtension: "pdf"),
            let nsImage = NSImage(contentsOf: url) {
             nsImage.isTemplate = true
-            return Image(nsImage: nsImage)
+            image = Image(nsImage: nsImage)
+        } else {
+            image = Image(systemName: "app.dashed")
         }
-        return Image(systemName: "app.dashed")
+        loaded[name] = image
+        return image
     }
 }
 
-/// Short "resets in" string, e.g. "2h 14m" or "3d 4h".
 func resetCountdown(_ date: Date?) -> String? {
     guard let date else { return nil }
     let seconds = Int(date.timeIntervalSinceNow)
@@ -43,32 +41,19 @@ func resetCountdown(_ date: Date?) -> String? {
     return "\(m)m"
 }
 
-/// How much calendar context a window's reset time needs to be unambiguous.
 enum ResetTimeStyle {
-    /// Within a day (5-hour): "3:45 PM".
     case time
-    /// Within a week (weekly): "Tue 3:45 PM".
     case weekday
-    /// Weeks out (monthly), where a weekday alone is ambiguous: "Sep 15, 3:45 PM".
     case date
 }
 
-/// Wall-clock reset time in the user's local timezone.
 func resetClockTime(_ date: Date?, style: ResetTimeStyle) -> String? {
     guard let date else { return nil }
+    let time = date.formatted(.dateTime.hour().minute())
     switch style {
-    case .time: return localized("j:mm", date)
-    case .weekday: return localized("EEE j:mm", date)
-    // A combined date+time template renders as "Sep 15 at 3:45 PM", which overruns
-    // the row inside the 300pt popover — join the two parts instead.
-    case .date: return "\(localized("MMM d", date)), \(localized("j:mm", date))"
+    case .time: return time
+    case .weekday: return date.formatted(.dateTime.weekday(.abbreviated).hour().minute())
+    // A combined date+time format ("Sep 15 at 3:45 PM") overruns the popover row.
+    case .date: return "\(date.formatted(.dateTime.month(.abbreviated).day())), \(time)"
     }
-}
-
-private func localized(_ template: String, _ date: Date) -> String {
-    let formatter = DateFormatter()
-    formatter.locale = .autoupdatingCurrent
-    formatter.timeZone = .autoupdatingCurrent
-    formatter.setLocalizedDateFormatFromTemplate(template)
-    return formatter.string(from: date)
 }

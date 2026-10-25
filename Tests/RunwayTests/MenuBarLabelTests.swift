@@ -50,4 +50,15 @@ final class MenuBarLabelTests: XCTestCase {
             MenuBarLabel.tokenText(shortCode: "CX", usage: usage),
             "CX")
     }
+
+    @MainActor func testUnchangedTokensReuseTheRenderedImage() {
+        let tokens = [MenuBarLabel.Token(text: "CL38", locked: false)]
+        let first = MenuBarLabel.image(tokens: tokens)
+
+        XCTAssertTrue(MenuBarLabel.image(tokens: tokens) === first)
+
+        let changed = MenuBarLabel.image(tokens: [MenuBarLabel.Token(text: "CL", locked: true)])
+        XCTAssertFalse(changed === first)
+        XCTAssertNotEqual(changed.size, first.size)
+    }
 }

@@ -35,6 +35,32 @@ final class ClaudeCredentialCacheTests: XCTestCase {
         XCTAssertEqual(loads.value, 2)
     }
 
+    func testChangedSourceReloadsUnexpiredCache() async {
+        let cache = CredentialCache()
+        let loads = LockedCounter()
+        let oldAccount = credential(
+            token: "old-account",
+            expiresAt: Date().addingTimeInterval(8 * 60 * 60))
+
+        _ = await cache.current(sourceVersion: "before-login") {
+            loads.increment()
+            return [oldAccount]
+        }
+        let unchanged = await cache.current(sourceVersion: "before-login") {
+            loads.increment()
+            return []
+        }
+        let newAccount = credential(token: "new-account")
+        let afterLogin = await cache.current(sourceVersion: "after-login") {
+            loads.increment()
+            return [newAccount]
+        }
+
+        XCTAssertEqual(unchanged.map(\.accessToken), ["old-account"])
+        XCTAssertEqual(afterLogin.map(\.accessToken), ["new-account"])
+        XCTAssertEqual(loads.value, 2)
+    }
+
     func testExpiredOnlyLookupIsNotCached() async {
         let cache = CredentialCache()
         let loads = LockedCounter()

@@ -9,15 +9,17 @@ Runway is a minimal macOS menu-bar app showing **5-hour**, **weekly**, and (wher
 ```bash
 swift build                        # debug build (fast compile check)
 swift test                         # credential/cache regression tests
-swift run                          # run unbundled for dev (shows in Dock; resources via Bundle.module)
+swift run                          # run unbundled for dev (shows in Dock; resource bundle found beside the executable)
 ./Scripts/build-app.sh release     # build the real menu-bar app -> build/Runway.app (ad-hoc signed)
 open build/Runway.app          # launch it
 ./Scripts/make-icon.sh             # regenerate Assets/AppIcon.icns from the gauge.with.needle SF Symbol
 ```
 
 There is no linter configured. Run `swift test`, then verify app-facing changes by
-building the bundle and observing it in the menu bar (the popover is driven via
-System Events for screenshots during development).
+building the bundle and observing it in the menu bar. Open the popover with a real
+mouse click (a CGEvent posted at the item's position, from System Events' `position`
+of `menu bar item 1 of menu bar 2`); System Events' `click`/`AXPress` don't open a
+`MenuBarExtra` window. Capture with `screencapture -R` around the item.
 
 ## Architecture
 
@@ -54,9 +56,9 @@ Launch-at-login (`SMAppService.mainApp.register()`) only works from the **bundle
 
 ## Critical gotchas
 
-- **`MenuBarExtra` label rendering is severely limited.** It reliably renders an `Image` + one `Text` and **silently drops** additional sibling views, `ForEach`, nested stacks, and inline-Image-in-`Text`. The label is therefore drawn as a single template `NSImage` in `App/MenuBarLabel.swift` (gauge glyph + per-provider text + SF Symbol locks composited by hand). Do not try to rebuild it with SwiftUI views — it will only show the first token.
-- **Keychain reads go through the `security` CLI to avoid prompts.** The `claude` CLI stores `Claude Code-credentials` via `/usr/bin/security`, so that binary is on the item's ACL and `Keychain.readGenericPasswordViaSecurityCLI` (a `security find-generic-password -w` subprocess, 2s timeout) reads it with **no prompt ever** — surviving token rotation (which rewrites the item and resets its ACL, wiping any "Always Allow" granted to Runway) and ad-hoc re-signs. The direct `SecItemCopyMatching` read is only a fallback and is the path that prompts. `ClaudeProvider`'s `CredentialCache` actor still caches in memory so polls don't spawn a subprocess each time.
-- **SwiftPM resource bundle + codesign.** SwiftPM emits a flat `Runway_Runway.bundle` (no Info.plist). `build-app.sh` copies it into `Contents/Resources/`, **injects a minimal Info.plist** so codesign accepts it as a nested bundle, and signs inner-bundle-first. `Bundle.module` resolves logos from there. The `.icns` and `LSUIElement`/`CFBundleIconFile` are also assembled in `build-app.sh` (there is no committed Info.plist for the app).
+- **`MenuBarExtra` label rendering is severely limited.** It reliably renders an `Image` + one `Text` and **silently drops** additional sibling views, `ForEach`, nested stacks, and inline-Image-in-`Text`. The label is therefore drawn as a single template `NSImage` in `App/MenuBarLabel.swift` (gauge glyph + per-provider text + SF Symbol locks composited by hand). Do not try to rebuild it with SwiftUI views — it will only show the first token. The label is re-evaluated on every store change, so `MenuBarLabel.image` returns the cached image unless the tokens or menu-bar font size changed; it draws via a drawing handler (not the deprecated `lockFocus`) so the cached image stays sharp at any display scale.
+- **Keychain reads go through the `security` CLI to avoid prompts.** The `claude` CLI stores `Claude Code-credentials` via `/usr/bin/security`, so that binary is on the item's ACL and `Keychain.readGenericPasswordViaSecurityCLI` (a `security find-generic-password -w` subprocess, 2s timeout) reads it with **no prompt ever** — surviving token rotation (which rewrites the item and resets its ACL, wiping any "Always Allow" granted to Runway) and ad-hoc re-signs. The direct `SecItemCopyMatching` read is only a fallback and is the path that prompts. `ClaudeProvider`'s `CredentialCache` actor still caches in memory so polls don't spawn a subprocess each time. The cache is keyed on `credentialsVersion()` (the keychain item's modification date, read via an attributes-only `SecItemCopyMatching` that needs no ACL access, plus `.credentials.json`'s mtime and a hash of the desktop app's encrypted token blob), so a `/login` to another account is picked up on the next poll. Without that, the previous account's still-valid token kept reporting its usage until it expired. Don't key on the desktop `config.json` mtime: the app rewrites that file constantly for UI state.
+- **SwiftPM resource bundle + codesign.** `build-app.sh` copies `Runway_Runway.bundle` into `Contents/Resources/` and signs inner-bundle-first. Older SwiftPM emits it flat with no Info.plist, so the script **injects a minimal one** at the bundle root; Swift 6.4+ emits a standard `Contents/` layout, where the plist goes in `Contents/` only if missing — a root Info.plist there is unsealed content codesign rejects. Logos are **not** loaded via `Bundle.module` (its accessor `fatalError`s in a packaged app because it only looks at the bundle root); `Logo` in `Views/Support.swift` locates the bundle by hand and caches each image. The `.icns` and `LSUIElement`/`CFBundleIconFile` are also assembled in `build-app.sh` (there is no committed Info.plist for the app).
 - **Rate limiting.** Frequent Claude fetches hit Anthropic's rate limit (shown as "Rate limited by Anthropic"). `UsageStore.refresh(force:)` throttles non-forced refreshes (open + the configurable refresh timer) to once per 30s; only the ↻ button passes `force: true`. The shortest interval offered in Settings is 1 min, well above the 30s throttle.
 
 ## UI conventions
