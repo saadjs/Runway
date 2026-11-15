@@ -32,16 +32,5 @@ struct UsageBarView: View {
         .font(.callout)
         .lineLimit(1)
         .minimumScaleFactor(0.9)
-        .tint(tint)
-    }
-
-    private var tint: Color {
-        guard let window else { return .accentColor }
-        switch window.usedPercent {
-        case ..<50: return .green
-        case ..<75: return .yellow
-        case ..<90: return .orange
-        default: return .red
-        }
     }
 }

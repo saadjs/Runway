@@ -12,7 +12,7 @@ if [ "$SIGN_IDENTITY" != "-" ]; then
     SIGN_FLAGS+=(--options runtime --timestamp)
 fi
 
-APP_VERSION="${APP_VERSION:-1.10}"
+APP_VERSION="${APP_VERSION:-1.11}"
 APP_BUILD="${APP_BUILD:-1}"
 
 cd "$ROOT"
@@ -67,7 +67,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>1.0</string>
     <key>CFBundleVersion</key><string>1</string>
-    <key>LSMinimumSystemVersion</key><string>13.0</string>
+    <key>LSMinimumSystemVersion</key><string>26.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHumanReadableCopyright</key><string>Runway</string>
 </dict>

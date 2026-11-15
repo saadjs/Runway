@@ -16,6 +16,7 @@ struct MenuView: View {
                 Spacer(minLength: 8)
                 Button { openSettings() } label: {
                     Image(systemName: "gearshape")
+                        .frame(width: 16, height: 16)
                 }
                 .help("Settings")
                 .keyboardShortcut(",", modifiers: .command)
@@ -23,14 +24,14 @@ struct MenuView: View {
                     Task { await store.refresh(force: true) }
                 } label: {
                     Image(systemName: "arrow.clockwise")
+                        .frame(width: 16, height: 16)
                 }
                 .disabled(store.isRefreshing)
                 .help("Refresh now")
                 .keyboardShortcut("r", modifiers: .command)
             }
-            .buttonStyle(.borderless)
-            .imageScale(.medium)
-            .frame(height: 18)
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
 
             if visibleProviders.isEmpty {
                 Text("All providers hidden — enable them in Settings.")
@@ -51,23 +52,22 @@ struct MenuView: View {
                 Text(footerText)
                 Spacer(minLength: 8)
                 Button("Quit") { NSApplication.shared.terminate(nil) }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.glass)
+                    .controlSize(.small)
                     .help("Quit Runway")
                     .keyboardShortcut("q", modifiers: .command)
             }
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 14)
-        .padding(.bottom, 30)
+        .padding()
         .frame(width: 320)
         .onAppear { Task { await store.refresh() } }
     }
 
     private func openSettings() {
         openWindow(id: SettingsWindow.id)
-        NSApp.activate(ignoringOtherApps: true)
+        NSApp.activate()
     }
 
     private var footerText: String {

@@ -50,7 +50,9 @@ jobs:
           SHA="${{ steps.asset.outputs.sha256 }}"
           sed -i -E "s/^  version \".*\"/  version \"${VERSION}\"/" "$CASK"
           sed -i -E "s/^  sha256 \".*\"/  sha256 \"${SHA}\"/" "$CASK"
-          echo "--- updated cask ---"; sed -n '1,10p' "$CASK"
+          # Keep in sync with LSMinimumSystemVersion in Scripts/build-app.sh.
+          sed -i -E "s/^  depends_on macos: .*/  depends_on macos: :tahoe/" "$CASK"
+          echo "--- updated cask ---"; sed -n '1,15p' "$CASK"
 
       - name: Commit and push
         run: |

@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-Runway is a minimal macOS menu-bar app showing **5-hour**, **weekly**, and (where the provider has one) **monthly** usage limits for **Claude Code**, **Codex**, and **OpenCode Go** only. SwiftPM executable, macOS 13+, SwiftUI `MenuBarExtra`, menu-bar only (no Dock icon).
+Runway is a minimal macOS menu-bar app showing **5-hour**, **weekly**, and (where the provider has one) **monthly** usage limits for **Claude Code**, **Codex**, and **OpenCode Go** only. SwiftPM executable, macOS 26+, SwiftUI `MenuBarExtra`, menu-bar only (no Dock icon).
 
 ## Commands
 

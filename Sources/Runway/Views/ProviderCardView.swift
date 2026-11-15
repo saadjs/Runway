@@ -53,8 +53,6 @@ struct ProviderCardView: View {
                 }
             }
             .lineLimit(1)
-            .padding(.leading, -4)
-            .padding(.trailing, 4)
         }
     }
 }

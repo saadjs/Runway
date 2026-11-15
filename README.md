@@ -7,12 +7,12 @@
 </p>
 
 <p align="center">
-  <sub>macOS 13+ · SwiftUI <code>MenuBarExtra</code> · menu-bar only (no Dock icon)</sub>
+  <sub>macOS 26+ · SwiftUI <code>MenuBarExtra</code> · menu-bar only (no Dock icon)</sub>
 </p>
 
 <p align="center">
   <a href="https://github.com/saadjs/Runway/releases"><img src="https://img.shields.io/github/v/release/saadjs/Runway?sort=semver&display_name=tag&label=release&color=2dba4e" alt="Latest release"></a>
-  <img src="https://img.shields.io/badge/macOS-13%2B-000000?logo=apple&logoColor=white" alt="macOS 13+">
+  <img src="https://img.shields.io/badge/macOS-26%2B-000000?logo=apple&logoColor=white" alt="macOS 26+">
   <img src="https://img.shields.io/badge/Swift-5-F05138?logo=swift&logoColor=white" alt="Swift 5">
   <a href="https://github.com/saadjs/homebrew-tap"><img src="https://img.shields.io/badge/install-brew%20cask-FBB040?logo=homebrew&logoColor=white" alt="Homebrew cask"></a>
   <img src="https://img.shields.io/badge/notarized-%E2%9C%93-2dba4e" alt="Notarized">
