@@ -12,7 +12,7 @@ if [ "$SIGN_IDENTITY" != "-" ]; then
     SIGN_FLAGS+=(--options runtime --timestamp)
 fi
 
-APP_VERSION="${APP_VERSION:-1.11}"
+APP_VERSION="${APP_VERSION:-1.12}"
 APP_BUILD="${APP_BUILD:-1}"
 
 cd "$ROOT"

@@ -25,10 +25,7 @@ struct ClaudeProvider: UsageProvider {
             }
             do {
                 let usage = try await ClaudeUsageAPI.fetch(accessToken: creds.accessToken)
-                return ProviderUsage(
-                    fiveHour: usage.fiveHour?.usageWindow,
-                    weekly: usage.sevenDay?.usageWindow,
-                    planLabel: creds.planLabel)
+                return usage.providerUsage(planLabel: creds.planLabel)
             } catch {
                 guard Self.allowsCredentialFallback(after: error) else {
                     throw error
@@ -51,10 +48,7 @@ struct ClaudeProvider: UsageProvider {
             }
             do {
                 let usage = try await ClaudeUsageAPI.fetch(accessToken: creds.accessToken)
-                return ProviderUsage(
-                    fiveHour: usage.fiveHour?.usageWindow,
-                    weekly: usage.sevenDay?.usageWindow,
-                    planLabel: creds.planLabel)
+                return usage.providerUsage(planLabel: creds.planLabel)
             } catch {
                 guard Self.allowsCredentialFallback(after: error) else { throw error }
                 lastError = error
@@ -284,16 +278,72 @@ enum ClaudeDesktopCredentials {
 
 // MARK: - OAuth usage endpoint
 
-private enum ClaudeUsageAPI {
+enum ClaudeUsageAPI {
     private static let url = URL(string: "https://api.anthropic.com/api/oauth/usage")!
 
     struct Response: Decodable {
         let fiveHour: Window?
         let sevenDay: Window?
+        let limits: [Limit]?
 
         enum CodingKeys: String, CodingKey {
             case fiveHour = "five_hour"
             case sevenDay = "seven_day"
+            case limits
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            fiveHour = try c.decodeIfPresent(Window.self, forKey: .fiveHour)
+            sevenDay = try c.decodeIfPresent(Window.self, forKey: .sevenDay)
+            // Newer, richer field: an unexpected shape must not break the 5-hour/weekly bars.
+            limits = (try? c.decodeIfPresent([Lossy<Limit>].self, forKey: .limits))??
+                .compactMap(\.value)
+        }
+
+        /// Decodes one array element, yielding nil instead of failing the whole array.
+        private struct Lossy<T: Decodable>: Decodable {
+            let value: T?
+            init(from decoder: Decoder) throws { value = try? T(from: decoder) }
+        }
+
+        func providerUsage(planLabel: String?) -> ProviderUsage {
+            ProviderUsage(
+                fiveHour: fiveHour?.usageWindow,
+                weekly: sevenDay?.usageWindow,
+                modelWeekly: (limits ?? []).compactMap(\.modelWeekly),
+                planLabel: planLabel)
+        }
+
+        /// Plans with a per-model cap (Max/Ultra's Fable limit) list it as a `weekly_scoped` entry; others omit it.
+        struct Limit: Decodable {
+            let kind: String?
+            let percent: Double?
+            let resetsAt: String?
+            let scope: Scope?
+
+            enum CodingKeys: String, CodingKey {
+                case kind, percent, scope
+                case resetsAt = "resets_at"
+            }
+
+            struct Scope: Decodable {
+                let model: Model?
+                struct Model: Decodable {
+                    let displayName: String?
+                    enum CodingKeys: String, CodingKey { case displayName = "display_name" }
+                }
+            }
+
+            var modelWeekly: ScopedUsageWindow? {
+                guard kind == "weekly_scoped",
+                      let model = scope?.model?.displayName, !model.isEmpty,
+                      let percent
+                else { return nil }
+                return ScopedUsageWindow(
+                    title: "\(model) weekly",
+                    window: UsageWindow(usedPercent: percent, resetsAt: ISO8601Timestamp.date(from: resetsAt)))
+            }
         }
 
         struct Window: Decodable {

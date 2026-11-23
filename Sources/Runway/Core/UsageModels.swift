@@ -7,10 +7,18 @@ struct UsageWindow: Equatable, Sendable {
     var clampedFraction: Double { min(max(usedPercent / 100, 0), 1) }
 }
 
+/// A limit that applies to one model only (e.g. Claude's weekly Fable cap), drawn as its own bar.
+struct ScopedUsageWindow: Equatable, Sendable {
+    let title: String
+    let window: UsageWindow
+}
+
 struct ProviderUsage: Equatable, Sendable {
     var fiveHour: UsageWindow?
     var weekly: UsageWindow?
     var monthly: UsageWindow?
+    /// Only blocks that model, so it is not part of `isBlocked`.
+    var modelWeekly: [ScopedUsageWindow] = []
     var planLabel: String?
 
     var fiveHourReached: Bool { (fiveHour?.usedPercent ?? 0) >= 100 }

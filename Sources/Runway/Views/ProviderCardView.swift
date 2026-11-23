@@ -22,6 +22,9 @@ struct ProviderCardView: View {
                 VStack(spacing: 10) {
                     UsageBarView(title: "5-hour", window: usage.fiveHour, showResetCountdown: showResetCountdown)
                     UsageBarView(title: "Weekly", window: usage.weekly, showResetCountdown: showResetCountdown, resetStyle: .weekday)
+                    ForEach(Array(usage.modelWeekly.enumerated()), id: \.offset) { _, scoped in
+                        UsageBarView(title: scoped.title, window: scoped.window, showResetCountdown: showResetCountdown, resetStyle: .weekday)
+                    }
                     if let monthly = usage.monthly {
                         UsageBarView(title: "Monthly", window: monthly, showResetCountdown: showResetCountdown, resetStyle: .date)
                     }

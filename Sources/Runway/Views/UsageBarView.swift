@@ -32,5 +32,22 @@ struct UsageBarView: View {
         .font(.callout)
         .lineLimit(1)
         .minimumScaleFactor(0.9)
+        .tint(tint)
+    }
+
+    /// System semantic colors so usage reads at a glance: green with headroom, red when nearly exhausted.
+    private var tint: Color {
+        guard let window else { return .accentColor }
+        return Self.tint(forUsedPercent: window.usedPercent)
+    }
+
+    /// Thresholds use the rounded value the label shows, so "50% used" is never green.
+    static func tint(forUsedPercent percent: Double) -> Color {
+        switch percent.rounded() {
+        case ..<50: return .green
+        case ..<75: return .yellow
+        case ..<90: return .orange
+        default: return .red
+        }
     }
 }
